@@ -5,7 +5,8 @@
 ```text
 CLI
  └─ document orchestration and atomic publication
-     ├─ color-space inventory and resource resolution
+     ├─ semantic color-space inventory
+     ├─ content resource resolution
      ├─ document safety preflight
      └─ stateful content-stream rewrite
          └─ shared domain models and object identity helpers
@@ -16,8 +17,15 @@ CLI
 - `cli.py` owns arguments, exit codes, and human-readable output.
 - `document.py` owns strict opening, two-pass processing, temporary output,
   post-save verification, and atomic replacement.
-- `colors.py` owns PDF Name decoding, Separation/DeviceN inventory, color-space
-  lookup, and safe resource cleanup.
+- `inventory.py` assembles the role-aware Separation/DeviceN/NChannel report.
+- `inventory_graph.py` owns iterative reachable-object traversal and location
+  propagation.
+- `inventory_prepress.py` inventories supported page and annotation prepress
+  dependencies.
+- `inventory_values.py` owns small PDF value decoders, path encoding, and
+  colorant role rules.
+- `colors.py` owns PDF Name decoding, content color-space lookup, syntactic
+  color-space parsing, and safe resource cleanup.
 - `scan.py` owns document-level mutation restrictions and unsupported-construct
   preflight.
 - `content.py` interprets the graphics-state subset needed to remove supported
@@ -53,11 +61,13 @@ keeps the all-or-nothing guarantee simple and auditable.
 
 ## Resource limits
 
-General object inventory uses iterative traversal with cycle tracking. Form
-invocation and resource nesting are limited to 64 levels and fail with a normal
-user-facing error beyond that boundary. Operators with unresolved color spaces,
-patterns, XObjects, or shadings are rejected when encountered during a removal
-pass.
+General object inventory uses iterative, root-context-aware traversal with cycle
+tracking and cached graph edges. Indirect definitions retain their PDF
+object/generation number; direct definitions use a deterministic reachable path
+as their identity. Form invocation and resource nesting are limited to 64 levels
+and fail with a normal user-facing error beyond that boundary. Operators with
+unresolved color spaces, patterns, XObjects, or shadings are rejected when
+encountered during a removal pass.
 
 The tool does not impose whole-process CPU or memory quotas. Use an external
 sandbox for hostile PDFs as described in [SECURITY.md](../SECURITY.md).

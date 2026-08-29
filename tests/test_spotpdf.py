@@ -12,7 +12,13 @@ import pikepdf
 from spotpdf.cli import _stats_text, build_parser
 from spotpdf.colors import discover_spot_declarations
 from spotpdf.document import check_spot, inspect_pdf, remove_all_spots, remove_spot
-from spotpdf.model import InvalidPdfError, RemovalStats, SpotKind, UnsupportedSpotUseError
+from spotpdf.model import (
+    ColorantRole,
+    InvalidPdfError,
+    RemovalStats,
+    SpotKind,
+    UnsupportedSpotUseError,
+)
 
 
 class SpotPdfTests(unittest.TestCase):
@@ -236,6 +242,8 @@ class SpotPdfTests(unittest.TestCase):
 
         report = inspect_pdf(source)
 
+        self.assertEqual(report.colorants["Cyan"].roles, {ColorantRole.PROCESS})
+        self.assertNotIn("Cyan", report.spots)
         self.assertEqual(report.spots["None"].kinds, {SpotKind.DEVICEN})
         self.assertEqual(report.spots["None"].contexts, {"reserved separation"})
         with self.assertRaisesRegex(InvalidPdfError, "reserved PDF separation names"):

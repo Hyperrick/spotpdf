@@ -60,7 +60,8 @@ uv run spotpdf --help
 
 ## Quick start
 
-List every reachable `/Separation` and `/DeviceN` colorant declaration:
+List every reachable named colorant from `/Separation`, `/DeviceN`/NChannel,
+and page `/SeparationInfo` declarations:
 
 ```bash
 spotpdf list input.pdf
@@ -69,17 +70,28 @@ spotpdf list input.pdf
 Example output from the synthetic demo:
 
 ```text
-NAME             KIND         PAGES  PAINT OPS  STATUS
-CutContour       Separation   1      2          painted
-Personalization  Separation   1      1          painted
-Varnish          Separation   1      1          painted
+NAME             ROLE  KIND         PAGES  PAINT OPS  STATUS
+CutContour       spot  Separation   1      2          painted
+Personalization  spot  Separation   1      1          painted
+Varnish          spot  Separation   1      1          painted
 ```
+
+`ROLE` distinguishes `spot`, `process`, `all`, and `none`. For NChannel color
+spaces, arbitrary names listed in `/Process /Components` are process channels,
+not spots. With a CMYK NChannel process space, canonical `/Cyan`, `/Magenta`,
+`/Yellow`, and `/Black` components also remain process channels even when they
+are omitted from `/Process /Components`; this shortcut does not apply to RGB or
+Lab process spaces.
 
 Check one exact, case-sensitive name:
 
 ```bash
 spotpdf check input.pdf --spot "Varnish"
 ```
+
+`list` shows the complete named-colorant inventory, including process channels.
+`check --spot` answers only for spot/removal candidates, so a process-only
+NChannel component shown by `list` is reported as absent by `check`.
 
 Remove supported paint for one name:
 
@@ -93,10 +105,11 @@ Remove all supported named spots in one atomic rewrite:
 spotpdf remove input.pdf --all -o output.pdf
 ```
 
-`--all` preserves process colorants named `/Cyan`, `/Magenta`, `/Yellow`, and
-`/Black`, plus the reserved names `/All` and `/None`. Matching is
-case-sensitive: a custom `/black` is removed by `--all`. An exact request such
-as `--spot Black` still removes that exact Separation.
+`--all` preserves NChannel process components and, conservatively, the exact
+canonical names `/Cyan`, `/Magenta`, `/Yellow`, and `/Black`, plus the reserved
+names `/All` and `/None`. Matching is case-sensitive: a custom `/black` is
+removed by `--all`. An exact request such as `--spot Black` still removes that
+exact Separation.
 
 Existing outputs are protected unless `--force` is supplied:
 
@@ -127,7 +140,8 @@ exit code `2` explicitly.
 | Vector fills, strokes, and combined path paint | Yes | Yes |
 | Text fill and stroke paint | Yes | Yes, when positioning remains safe |
 | Nested Form XObjects | Yes | Yes, with context and nesting safeguards |
-| `/DeviceN` declarations | Yes | No; selected DeviceN colorants fail closed |
+| `/DeviceN` and NChannel declarations | Role-aware | No; selected spot components fail closed |
+| Page `/SeparationInfo` | Yes | No; selected pre-separated colorants fail closed |
 | Images, inline images, patterns, and shadings | Inventory only | No |
 | Type 3 fonts, annotation appearances, and soft masks | Inventory only | No |
 | Signed PDFs | Read-only inspection | No; rewriting invalidates signatures |
@@ -154,7 +168,7 @@ uv run spotpdf remove tmp/pdfs/demo/input.pdf --all \
 uv run spotpdf list tmp/pdfs/demo/output.pdf
 ```
 
-The final command should print `No reachable spot colors found.` To render PNGs
+The final command should print `No reachable named colorants found.` To render PNGs
 like the README images, install Poppler and use `pdftoppm`:
 
 ```bash
@@ -198,7 +212,6 @@ customer, or production PDFs. Contribution and fixture rules are in
 The initial public release intentionally stays focused on inspect and remove.
 Planned follow-up work keeps these distinct:
 
-- role-aware DeviceN/NChannel inventory;
 - renaming a spot plate without changing its preview;
 - setting a spot's alternate CMYK preview without converting the plate;
 - converting a strictly supported Separation subset to explicit DeviceCMYK;

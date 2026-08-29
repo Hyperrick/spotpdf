@@ -20,10 +20,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    list_parser = commands.add_parser("list", help="list reachable spot-color declarations")
+    list_parser = commands.add_parser(
+        "list",
+        help="list reachable named colorants and their semantic roles",
+    )
     list_parser.add_argument("input", type=Path, help="input PDF")
 
-    check_parser = commands.add_parser("check", help="check for one exact spot-color name")
+    check_parser = commands.add_parser(
+        "check",
+        help="check for one exact spot or Separation name",
+    )
     check_parser.add_argument("input", type=Path, help="input PDF")
     check_parser.add_argument("--spot", required=True, help="exact, case-sensitive spot name")
 
@@ -38,8 +44,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="all_spots",
         help=(
-            "remove named spots while preserving process Cyan/Magenta/Yellow/Black "
-            "and reserved /All and /None"
+            "remove named spots while preserving NChannel process components, "
+            "canonical Cyan/Magenta/Yellow/Black, and reserved /All and /None"
         ),
     )
     remove_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
@@ -91,16 +97,20 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _print_report(report) -> None:
-    if not report.spots:
-        print("No reachable spot colors found.")
+    if not report.colorants:
+        print("No reachable named colorants found.")
         return
-    print("NAME\tKIND\tPAGES\tPAINT OPS\tSTATUS")
-    for name in sorted(report.spots, key=str.casefold):
-        summary = report.spots[name]
+    print("NAME\tROLE\tKIND\tPAGES\tPAINT OPS\tSTATUS")
+    for name in sorted(report.colorants, key=str.casefold):
+        summary = report.colorants[name]
+        roles = ",".join(sorted(role.value for role in summary.roles))
         kinds = ",".join(sorted(kind.value for kind in summary.kinds))
         pages = ",".join(str(page) for page in sorted(summary.pages)) or "-"
         status = "; ".join(sorted(summary.contexts)) or "declared"
-        print(f"{name}\t{kinds}\t{pages}\t{summary.paint_operations}\t{status}")
+        print(
+            f"{_display_name(name)}\t{roles}\t{kinds}\t{pages}\t"
+            f"{summary.paint_operations}\t{status}"
+        )
 
 
 def _print_batch_result(result: BatchRemovalResult, output: Path) -> None:
@@ -110,7 +120,8 @@ def _print_batch_result(result: BatchRemovalResult, output: Path) -> None:
     names = ", ".join(repr(name) for name in result.spots)
     print(
         f"Removed {len(result.spots)} named spot color(s): {names}; "
-        f"{_stats_text(result.stats)}; process CMYK and reserved /All and /None "
+        f"{_stats_text(result.stats)}; NChannel process components, canonical "
+        "/Cyan, /Magenta, /Yellow, /Black, and reserved /All and /None "
         "preserved; "
         f"output: {output}"
     )
@@ -130,6 +141,17 @@ def _stats_text(stats: RemovalStats) -> str:
 def _count(value: int, noun: str) -> str:
     suffix = "" if value == 1 else "s"
     return f"{value} {noun}{suffix}"
+
+
+def _display_name(name: str) -> str:
+    """Escape controls so PDF-provided names cannot inject TSV rows or columns."""
+
+    return "".join(
+        f"\\x{ord(character):02x}"
+        if ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
+        else character
+        for character in name
+    )
 
 
 if __name__ == "__main__":

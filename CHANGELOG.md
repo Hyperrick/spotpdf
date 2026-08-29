@@ -5,6 +5,23 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Role-aware DeviceN/NChannel inventory for arbitrary process component names,
+  canonical CMYK components, spot components, `/All`, and `/None`.
+- Stable object identities and human-readable locations for every reachable
+  Separation and DeviceN definition.
+- Exact-name dependency inventory for NChannel process/colorant/mixing-hint
+  entries, page `/SeparationInfo`, printer-mark colorants, and TrapNet
+  `/SeparationColorNames`.
+
+### Safety
+
+- `remove --all` no longer treats custom-named NChannel process components as
+  spots.
+- Removal fails closed when a selected name remains in a supported exact-name
+  prepress dependency, including pre-separated page metadata.
+
 ## [0.2.1] - 2026-08-29
 
 First public beta release.

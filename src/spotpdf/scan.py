@@ -8,14 +8,15 @@ import pikepdf
 
 from .colors import (
     SPECIAL_COLORANTS,
-    discover_spot_declarations,
     parse_color_space,
     pdf_name,
     resolve_color_space,
 )
+from .inventory import discover_spot_declarations
 from .model import (
     InspectionReport,
     InvalidPdfError,
+    NameDependencyKind,
     SpotKind,
     UnsupportedSpotUseError,
 )
@@ -72,6 +73,25 @@ def validate_spot_uses_for_removal(
         names = ", ".join(repr(name) for name in devicen_targets)
         raise UnsupportedSpotUseError(
             f"document: reachable DeviceN declarations contain target spot colors: {names}"
+        )
+    preseparated_targets = sorted(
+        {
+            dependency.name
+            for dependency in report.dependencies
+            if dependency.kind is NameDependencyKind.SEPARATION_INFO
+        }
+        & spots
+    )
+    if preseparated_targets:
+        names = ", ".join(repr(name) for name in preseparated_targets)
+        raise UnsupportedSpotUseError(
+            f"document: page SeparationInfo metadata contains target colorants: {names}"
+        )
+    dependency_targets = sorted({dependency.name for dependency in report.dependencies} & spots)
+    if dependency_targets:
+        names = ", ".join(repr(name) for name in dependency_targets)
+        raise UnsupportedSpotUseError(
+            f"document: exact-name prepress dependencies contain target colorants: {names}"
         )
 
     seen_forms = ObjectTracker()
