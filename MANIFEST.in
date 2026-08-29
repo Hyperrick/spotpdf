@@ -1,0 +1,15 @@
+include CHANGELOG.md
+include CONTRIBUTING.md
+include LICENSE
+include README.md
+include SECURITY.md
+recursive-include docs *.md *.png
+recursive-include examples *.py
+recursive-include tests *.py
+global-exclude *.pdf
+global-exclude .DS_Store
+global-exclude *.py[cod]
+prune .venv
+prune in
+prune out
+prune tmp
