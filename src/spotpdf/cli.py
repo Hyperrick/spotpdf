@@ -10,12 +10,13 @@ import pikepdf
 
 from .document import check_spot, inspect_pdf, remove_all_spots, remove_spot
 from .model import BatchRemovalResult, RemovalStats, SpotPdfError, __version__
+from .rename import rename_spot
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="spotpdf",
-        description="Inspect and remove named spot-color paint from vector PDF content.",
+        description="Inspect, rename, and remove named spot colors in vector PDF content.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -54,6 +55,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace an existing output after validation",
     )
+
+    rename_parser = commands.add_parser(
+        "rename",
+        help="atomically rename one exact Separation spot plate",
+    )
+    rename_parser.add_argument("input", type=Path, help="input PDF")
+    rename_parser.add_argument("--spot", required=True, help="exact source spot name")
+    rename_parser.add_argument("--to", required=True, dest="destination", help="exact target name")
+    rename_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
+    rename_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace an existing output after validation",
+    )
     return parser
 
 
@@ -83,6 +98,22 @@ def main(argv: list[str] | None = None) -> int:
                 force=args.force,
             )
             print(f"Removed {args.spot!r}: {_stats_text(stats)}; output: {args.output}")
+            return 0
+        if args.command == "rename":
+            result = rename_spot(
+                args.input,
+                args.output,
+                args.spot,
+                args.destination,
+                force=args.force,
+            )
+            print(
+                f"Renamed {result.source!r} to {result.destination!r} in "
+                f"{result.definitions_renamed} color-space definition(s) and "
+                f"{result.references_renamed} inventoried exact-name reference(s); "
+                "alternate colors, "
+                f"tint transforms, and paint operands preserved; output: {args.output}"
+            )
             return 0
     except (SpotPdfError, pikepdf.PdfError, OSError, TypeError, ValueError) as error:
         print(f"spotpdf: error: {error}", file=sys.stderr)

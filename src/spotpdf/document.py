@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import os
 import shutil
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,6 +28,7 @@ from .model import (
     UnsupportedSpotUseError,
 )
 from .objects import ObjectTracker, object_key
+from .publication import atomic_pdf_output, open_strict, save_pdf
 from .scan import (
     MAX_FORM_NESTING,
     validate_document_for_changes,
@@ -50,7 +49,7 @@ class _ProcessingContext:
 def inspect_pdf(path: Path) -> InspectionReport:
     """Inspect reachable spot declarations and supported paint usage."""
 
-    with _open_strict(path) as pdf:
+    with open_strict(path) as pdf:
         report = discover_spot_declarations(pdf)
         for name, summary in report.colorants.items():
             if name in SPECIAL_COLORANTS:
@@ -82,7 +81,7 @@ def inspect_pdf(path: Path) -> InspectionReport:
 def check_spot(path: Path, spot: str) -> bool:
     """Return whether a name is a reachable spot or legacy Separation target."""
 
-    with _open_strict(path) as pdf:
+    with open_strict(path) as pdf:
         return spot in discover_spot_declarations(pdf).spots
 
 
@@ -124,24 +123,11 @@ def _remove_spots(
 ) -> BatchRemovalResult:
     """Apply one set-aware rewrite and publish it only after strict validation."""
 
-    input_path = input_path.resolve()
-    if not input_path.is_file():
-        raise InvalidPdfError(f"input PDF does not exist: {input_path}")
-    output_path = _output_path_without_final_symlink_resolution(output_path)
-    if input_path == output_path:
-        raise InvalidPdfError("input and output paths must be different")
-    if output_path.is_symlink():
-        raise InvalidPdfError(f"output path must not be a symbolic link: {output_path}")
-    if output_path.exists() and not force:
-        raise InvalidPdfError(f"output already exists (use --force): {output_path}")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    temp_path = _temporary_output_path(output_path)
     stats = RemovalStats()
     targets: frozenset[str] = frozenset()
     require_no_all_mode_targets = requested is None
-    try:
-        with _open_strict(input_path) as pdf:
+    with atomic_pdf_output(input_path, output_path, force=force) as output:
+        with open_strict(output.input_path) as pdf:
             declarations = discover_spot_declarations(pdf)
             declared_names = frozenset(declarations.spots)
             if requested is None:
@@ -150,7 +136,7 @@ def _remove_spots(
                 targets = requested & declared_names
 
             if not targets:
-                shutil.copyfile(input_path, temp_path)
+                shutil.copyfile(output.input_path, output.temp_path)
             else:
                 validate_document_for_changes(
                     pdf,
@@ -171,27 +157,15 @@ def _remove_spots(
                     if remaining_targets:
                         names = ", ".join(repr(name) for name in sorted(remaining_targets))
                         raise SpotPdfError(f"remove-all left removable spot colors behind: {names}")
-                pdf.save(
-                    temp_path,
-                    force_version=pdf.pdf_version,
-                    preserve_pdfa=True,
-                    compress_streams=True,
-                    object_stream_mode=pikepdf.ObjectStreamMode.preserve,
-                    linearize=pdf.is_linearized,
-                )
+                save_pdf(pdf, output.temp_path)
 
-        shutil.copymode(input_path, temp_path)
         _verify_saved_pdf(
-            temp_path,
+            output.temp_path,
             targets,
             require_no_all_mode_targets=require_no_all_mode_targets,
         )
-        os.replace(temp_path, output_path)
-        names = tuple(sorted(targets, key=lambda name: (name.casefold(), name)))
-        return BatchRemovalResult(spots=names, stats=stats)
-    finally:
-        if temp_path.exists():
-            temp_path.unlink()
+    names = tuple(sorted(targets, key=lambda name: (name.casefold(), name)))
+    return BatchRemovalResult(spots=names, stats=stats)
 
 
 def _process_document(
@@ -333,32 +307,13 @@ def _change_counter(stats: RemovalStats) -> tuple[int, ...]:
     )
 
 
-def _open_strict(path: Path) -> pikepdf.Pdf:
-    try:
-        pdf = pikepdf.open(
-            path,
-            attempt_recovery=False,
-            suppress_warnings=False,
-            inherit_page_attributes=True,
-        )
-    except (pikepdf.PdfError, pikepdf.PasswordError) as error:
-        raise InvalidPdfError(f"cannot open PDF safely: {error}") from error
-    syntax_errors = pdf.check_pdf_syntax()
-    warnings = pdf.get_warnings()
-    if syntax_errors or warnings:
-        pdf.close()
-        details = "; ".join(str(item) for item in [*syntax_errors, *warnings])
-        raise InvalidPdfError(f"PDF syntax warnings are not accepted: {details}")
-    return pdf
-
-
 def _verify_saved_pdf(
     path: Path,
     targets: frozenset[str],
     *,
     require_no_all_mode_targets: bool,
 ) -> None:
-    with _open_strict(path) as pdf:
+    with open_strict(path) as pdf:
         remaining = discover_spot_declarations(pdf)
         remaining_targets = targets & remaining.spots.keys()
         if remaining_targets:
@@ -371,19 +326,3 @@ def _verify_saved_pdf(
                 raise SpotPdfError(f"saved PDF still has removable spot colors: {names}")
         for page in pdf.pages:
             pikepdf.parse_content_stream(page)
-
-
-def _temporary_output_path(output_path: Path) -> Path:
-    descriptor, name = tempfile.mkstemp(
-        prefix=f".{output_path.stem}-", suffix=".tmp.pdf", dir=output_path.parent
-    )
-    os.close(descriptor)
-    return Path(name)
-
-
-def _output_path_without_final_symlink_resolution(path: Path) -> Path:
-    """Resolve the parent while preserving the final path component verbatim."""
-
-    if path.name in {"", ".", ".."}:
-        raise InvalidPdfError(f"output must name a PDF file: {path}")
-    return path.parent.resolve() / path.name

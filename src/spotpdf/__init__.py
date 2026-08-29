@@ -1,4 +1,4 @@
-"""Remove named spot-color paint from PDF content streams."""
+"""Inspect, rename, and remove named spot colors in PDF content."""
 
 from .model import __version__
 

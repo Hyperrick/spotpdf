@@ -1,4 +1,4 @@
-"""Document-level safety checks for spot-color removal."""
+"""Document-level safety checks for spot-color mutations."""
 
 from __future__ import annotations
 
@@ -39,20 +39,26 @@ def validate_document_for_changes(
 ) -> None:
     """Reject inputs whose selected spot colors cannot all be removed safely."""
 
-    if pdf.is_encrypted:
-        raise InvalidPdfError("encrypted PDFs are not supported")
-    if not pdf.allow.modify_other:
-        raise InvalidPdfError("the PDF permissions do not allow content modification")
-    if _contains_signature(pdf.Root):
-        raise InvalidPdfError(
-            "signed PDFs are not modified because rewriting invalidates signatures"
-        )
+    validate_document_for_mutation(pdf)
     reserved = spots & SPECIAL_COLORANTS
     if reserved:
         names = ", ".join(repr(name) for name in sorted(reserved))
         raise InvalidPdfError(f"{names} are reserved PDF separation names")
 
     validate_spot_uses_for_removal(pdf, spots, declarations=declarations)
+
+
+def validate_document_for_mutation(pdf: pikepdf.Pdf) -> None:
+    """Reject document states that cannot be rewritten safely by any command."""
+
+    if not pdf.allow.modify_other:
+        raise InvalidPdfError("the PDF permissions do not allow content modification")
+    if pdf.is_encrypted:
+        raise InvalidPdfError("encrypted PDFs are not supported")
+    if _contains_signature(pdf.Root):
+        raise InvalidPdfError(
+            "signed PDFs are not modified because rewriting invalidates signatures"
+        )
 
 
 def validate_spot_uses_for_removal(

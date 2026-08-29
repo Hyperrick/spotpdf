@@ -21,7 +21,7 @@ class InvalidPdfError(SpotPdfError):
 
 
 class UnsupportedSpotUseError(SpotPdfError):
-    """Raised when removing a target would require unsupported semantics."""
+    """Raised when changing a target would require unsupported semantics."""
 
 
 class SpotKind(StrEnum):
@@ -225,3 +225,13 @@ class BatchRemovalResult:
 
     spots: tuple[str, ...]
     stats: RemovalStats
+
+
+@dataclass(frozen=True)
+class RenameResult:
+    """Summary of one atomic spot-plate rename."""
+
+    source: str
+    destination: str
+    definitions_renamed: int
+    references_renamed: int

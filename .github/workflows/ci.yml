@@ -71,6 +71,9 @@ jobs:
           enable-cache: true
       - name: Sync locked development environment
         run: uv sync --locked --dev
+      - name: Install Poppler for mandatory rename render comparison
+        if: runner.os == 'Linux' && matrix.python == '3.13'
+        run: sudo apt-get update && sudo apt-get install --yes poppler-utils
       - name: Run tests
         run: uv run python -m unittest discover -s tests -v
 

@@ -7,6 +7,12 @@ All notable user-visible changes are documented here. The project follows
 
 ### Added
 
+- Atomic `rename` command for exact, case-sensitive spot-plate aliasing without
+  changing alternate color spaces, tint transforms, tint operands, resource
+  aliases, or content streams.
+- Rename support for structurally consistent DeviceN/NChannel spot components,
+  `/Colorants`, `/MixingHints`, page `/SeparationInfo`, and normal PrinterMark
+  appearances.
 - Role-aware DeviceN/NChannel inventory for arbitrary process component names,
   canonical CMYK components, spot components, `/All`, and `/None`.
 - Stable object identities and human-readable locations for every reachable
@@ -17,6 +23,17 @@ All notable user-visible changes are documented here. The project follows
 
 ### Safety
 
+- Rename rejects missing or ambiguous sources, existing destinations, process
+  and reserved names, malformed name relationships, and unsupported TrapNet,
+  type 5 halftone, OPI, and PrinterMark rollover/down dependencies before any
+  output is published.
+- Rename output is reopened and semantically verified before atomic replacement;
+  failed `--force` processing preserves the existing destination.
+- Rename verification binds alternate spaces, tint transforms, content streams,
+  and dependency payloads to their semantic locations and rejects any change
+  beyond the planned name slots.
+- Target-related DeviceN/NChannel, Process, MixingHints, Colorants, and
+  SeparationInfo relationships are validated before mutation.
 - `remove --all` no longer treats custom-named NChannel process components as
   spots.
 - Removal fails closed when a selected name remains in a supported exact-name

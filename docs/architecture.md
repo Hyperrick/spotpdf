@@ -6,6 +6,7 @@
 CLI
  └─ document orchestration and atomic publication
      ├─ semantic color-space inventory
+     ├─ complete spot-rename planning and application
      ├─ content resource resolution
      ├─ document safety preflight
      └─ stateful content-stream rewrite
@@ -15,8 +16,21 @@ CLI
 ## Module responsibilities
 
 - `cli.py` owns arguments, exit codes, and human-readable output.
-- `document.py` owns strict opening, two-pass processing, temporary output,
-  post-save verification, and atomic replacement.
+- `document.py` owns inspect/check/remove orchestration and two-pass removal.
+- `publication.py` owns strict opening, compatibility-preserving saves,
+  temporary output, and atomic/no-clobber publication shared by mutating
+  commands.
+- `rename.py` owns rename orchestration, location-bound fingerprints, reverse
+  planning, and post-save semantic verification.
+- `rename_request.py` validates source/destination names and inventory roles.
+- `rename_hazards.py` detects unsupported target-related prepress structures.
+- `rename_structures.py` validates required target-related DeviceN/NChannel,
+  Process, MixingHints, Colorants, and SeparationInfo relationships.
+- `rename_plan.py` discovers every supported definition/dependency slot and
+  proves inventory coverage before mutation.
+- `rename_slots.py` owns physical name application, invariants, exact-slot
+  normalization, and semantic fingerprints for planned contexts and the full
+  trailer-reachable document graph.
 - `inventory.py` assembles the role-aware Separation/DeviceN/NChannel report.
 - `inventory_graph.py` owns iterative reachable-object traversal and location
   propagation.
@@ -41,23 +55,37 @@ The output path is never opened as the working document.
 strict open
   → declaration inventory
   → mutation preflight
-  → complete dry run
+  → complete rename plan or removal dry run
   → in-memory rewrite
-  → in-memory target check
+  → in-memory semantic check
   → save to sibling temporary file
-  → strict reopen and target check
+  → strict reopen and semantic verification
   → atomic destination replacement
 ```
 
 Any exception before the last step removes the temporary file. A pre-existing
 destination remains untouched, including when `--force` was requested.
 
-## Why dry-run and apply are separate
+## Why planning and apply are separate
 
-PDF semantics can depend on inherited graphics state, Form resources, and text
-rendering modes. The dry run proves that every selected use is supported before
-any in-memory object is changed. This currently costs a second stream parse but
-keeps the all-or-nothing guarantee simple and auditable.
+Removal semantics can depend on inherited graphics state, Form resources, and
+text rendering modes, so removal performs a full dry run. Rename first builds a
+deduplicated plan containing every definition slot and supported exact-name
+reference. In both cases the plan is known to be complete before any in-memory
+object is changed. Removal currently pays for a second stream parse; rename does
+not interpret or rewrite paint operands. It does parse page and Form content
+syntax after saving and compares their location-bound decoded stream hashes.
+
+For dictionary-key references such as `/Colorants`, `/Solidities`, and
+`/DotGain`, planning also checks the destination key before deleting the source
+key. Shared indirect objects are mutated once even when the inventory records
+several human-readable contexts. After application, rename builds the inverse
+plan (`new` to `old`) without applying it and requires its normalized definition,
+dependency-value, and location fingerprint to match the original plan.
+The whole-document guard masks only the exact slots in that plan while comparing
+the pre- and post-apply graph. A second exact post-apply fingerprint includes
+catalog, page tree, document information, and other semantic trailer entries and
+must still match after the temporary output is reopened.
 
 ## Resource limits
 

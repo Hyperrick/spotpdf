@@ -4,9 +4,10 @@
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 [![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-`spotpdf` is a small, fail-closed command-line tool for finding PDF spot colors
-and removing supported vector or text paint that uses a named `/Separation`
-color. Pages stay vector-based; the tool does not rasterize them.
+`spotpdf` is a small, fail-closed command-line tool for finding PDF spot colors,
+renaming spot plates, and removing supported vector or text paint that uses a
+named `/Separation` color. Pages stay vector-based; the tool does not rasterize
+them.
 
 > [!IMPORTANT]
 > This is a focused beta, not a general PDF preflight engine. Unsupported spot
@@ -35,7 +36,7 @@ production files are included in this repository.
 
 ## Install
 
-Python 3.11 or newer is required. Install the latest release as an
+Python 3.11 or newer is required. Install the latest stable release as an
 isolated command with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
@@ -47,6 +48,14 @@ Or use `pipx`:
 
 ```bash
 pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.2.1
+```
+
+Stable `v0.2.1` contains `list`, `check`, and `remove`. The `rename` command
+documented below is currently unreleased; install the current `main` branch to
+try it before the next tagged release:
+
+```bash
+uv tool install --force git+https://github.com/Hyperrick/spotpdf.git@main
 ```
 
 For development, clone the repository and use the locked environment:
@@ -93,6 +102,28 @@ spotpdf check input.pdf --spot "Varnish"
 `check --spot` answers only for spot/removal candidates, so a process-only
 NChannel component shown by `list` is reported as absent by `check`.
 
+Rename one spot plate without changing its preview color or paint values:
+
+```bash
+spotpdf rename input.pdf --spot "Old Name" --to "New Name" -o output.pdf
+```
+
+Rename matching is exact and case-sensitive. The command changes every
+supported semantic reference to the source plate as one transaction, including
+role-aware DeviceN/NChannel spot participation, matching `/Colorants` and
+`/MixingHints` entries, page `/SeparationInfo`, and normal printer-mark
+appearances. It does not alter alternate color spaces, tint transforms, tint
+operands, resource aliases, or content streams. This is plate aliasing, not a
+conversion to process color. The source must have at least one reachable true
+`/Separation` definition; DeviceN-only sources are rejected, while consistent
+DeviceN/NChannel participation is renamed alongside that Separation. See
+[PDF compatibility](docs/compatibility.md) for the deliberately unsupported
+prepress structures and the relevant sections of the
+[official Adobe-hosted ISO 32000-1:2008 copy](https://opensource.adobe.com/dc-acrobat-sdk-docs/standards/pdfstandards/pdf/PDF32000_2008.pdf).
+The initial supported subset fails closed when the source occurs only as an
+extra `/MixingHints` colorant for a DeviceN that neither declares it as a
+component nor supplies a matching `/Colorants` Separation.
+
 Remove supported paint for one name:
 
 ```bash
@@ -119,7 +150,8 @@ spotpdf remove input.pdf --all -o output.pdf --force
 
 Even with `--force`, the old output is replaced only after the new PDF has been
 written to a temporary file, reopened, parsed, and checked for remaining target
-spots.
+spots or stale rename references. The same atomic publication guarantee applies
+to `rename`.
 
 ## Exit codes
 
@@ -134,26 +166,32 @@ exit code `2` explicitly.
 
 ## Supported scope
 
-| PDF construct | `list` / `check` | `remove` |
-| --- | :---: | :---: |
-| Named `/Separation` declarations | Yes | Yes, for the supported paint below |
-| Vector fills, strokes, and combined path paint | Yes | Yes |
-| Text fill and stroke paint | Yes | Yes, when positioning remains safe |
-| Nested Form XObjects | Yes | Yes, with context and nesting safeguards |
-| `/DeviceN` and NChannel declarations | Role-aware | No; selected spot components fail closed |
-| Page `/SeparationInfo` | Yes | No; selected pre-separated colorants fail closed |
-| Images, inline images, patterns, and shadings | Inventory only | No |
-| Type 3 fonts, annotation appearances, and soft masks | Inventory only | No |
-| Signed PDFs | Read-only inspection | No; rewriting invalidates signatures |
-| Encrypted, malformed, or modification-restricted PDFs | Limited by parser | No |
+| PDF construct | `list` / `check` | `rename` | `remove` |
+| --- | :---: | :---: | :---: |
+| Named `/Separation` declarations | Yes | Yes | Yes, for the supported paint below |
+| Vector fills, strokes, and combined path paint | Yes | Unchanged | Yes |
+| Text fill and stroke paint | Yes | Unchanged | Yes, when positioning remains safe |
+| Nested Form XObjects | Yes | Definitions only | Yes, with context and nesting safeguards |
+| `/DeviceN` and NChannel declarations | Role-aware | Consistent spot components alongside a true Separation | No; selected spot components fail closed |
+| `/Colorants` and `/MixingHints` dependencies | Yes | Yes, when structurally consistent | No; selected dependencies fail closed |
+| Page `/SeparationInfo` | Yes | Yes, when structurally consistent | No; selected pre-separated colorants fail closed |
+| PrinterMark normal appearances (`/AP /N`) | Yes | Yes, when structurally consistent | No |
+| TrapNet `/SeparationColorNames` | Exact dependency inventory | No; target occurrence fails closed | No |
+| Type 5 halftones, OPI, PrinterMark `/AP /R` or `/AP /D` | No dedicated hazard scan | No; target occurrence fails closed | No |
+| Images, inline images, patterns, and shadings | Inventory only | Definitions only | No |
+| Type 3 fonts and soft masks | Inventory only | Definitions only | No |
+| Signed PDFs | Read-only inspection | No; rewriting invalidates signatures | No; rewriting invalidates signatures |
+| Encrypted or modification-restricted PDFs | Limited by parser | No | No |
+| Parser-detectable syntax errors or warnings | Limited by parser | No | No |
 
 Removal also stops for clipping text, mixed text that would require font
 metrics, shared Forms that need conflicting caller state, unresolved resources,
 cyclic Forms, and Form nesting beyond the documented safety limit. See the
 [compatibility notes](docs/compatibility.md) for exact behavior.
 
-If the requested spot is absent, the input is copied byte-for-byte to the new
-output path. The tool never edits an input file in place.
+If a requested removal spot is absent, the input is copied byte-for-byte to the
+new output path. A missing rename source is an error and publishes no output.
+The tool never edits an input file in place.
 
 ## Reproduce the demo
 
@@ -182,10 +220,11 @@ pdftoppm -png -r 144 -singlefile \
 ## How it stays safe
 
 1. Open without parser recovery and reject syntax warnings.
-2. Inventory reachable color declarations and preflight unsupported uses.
-3. Perform a complete dry run before changing the in-memory document.
-4. Rewrite all selected spots as one set-aware operation.
-5. Save beside the destination, reopen strictly, and verify the target is gone.
+2. Inventory reachable color declarations and exact-name dependencies.
+3. Build a complete rename plan or perform a complete removal dry run before
+   changing the in-memory document.
+4. Apply all planned references or selected paint changes as one operation.
+5. Save beside the destination, reopen strictly, and verify the result.
 6. Atomically replace the destination only after every check succeeds.
 
 This intentionally favors a clear refusal over a PDF that merely looks correct
@@ -209,17 +248,16 @@ customer, or production PDFs. Contribution and fixture rules are in
 
 ## Roadmap
 
-The initial public release intentionally stays focused on inspect and remove.
-Planned follow-up work keeps these distinct:
+The public beta intentionally keeps plate aliasing, preview changes, and
+process conversion as separate operations. Planned follow-up work includes:
 
-- renaming a spot plate without changing its preview;
 - setting a spot's alternate CMYK preview without converting the plate;
 - converting a strictly supported Separation subset to explicit DeviceCMYK;
 - single-pass inventory for documents containing many spot colors;
 - configurable processing budgets for hostile or multi-tenant automation.
 
-Renaming, changing an alternate color, and converting to process CMYK have
-different print semantics and will not be hidden behind one ambiguous command.
+Changing an alternate color and converting to process CMYK have different print
+semantics from `rename` and will not be hidden behind one ambiguous command.
 
 ## Project policy
 

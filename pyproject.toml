@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "spotpdf"
 version = "0.2.1"
-description = "Remove vector paint that uses a named PDF spot color."
+description = "Inspect, rename, and remove named spot colors in vector PDF content."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
