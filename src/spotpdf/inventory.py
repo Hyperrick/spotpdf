@@ -46,6 +46,7 @@ class _InventoryBuilder:
     def __init__(self, pdf: pikepdf.Pdf) -> None:
         self.pdf = pdf
         self.identities: dict[ObjectKey, PdfObjectIdentity] = {}
+        self.direct_objects: list[Any] = []
         self.definitions: dict[tuple[Any, ...], _DefinitionDraft] = {}
         self.role_overrides: dict[ObjectKey, dict[str, ColorantRole]] = {}
         self.location_role_overrides: dict[str, dict[str, ColorantRole]] = {}
@@ -125,7 +126,7 @@ class _InventoryBuilder:
         name = values.name_value(value[1])
         if name is None:
             return
-        key = object_key(value)
+        key = self._key_for(value)
         role = self.role_overrides.get(key, {}).get(name, values.base_role(name))
         for location in locations:
             location_role = self.location_role_overrides.get(location, {}).get(name)
@@ -350,7 +351,7 @@ class _InventoryBuilder:
     ) -> None:
         nested_locations = tuple(f"{location}[4] /Colorants {key_path}" for location in locations)
         role = values.devicen_role(nested_name, process_names)
-        raw_key = object_key(value)
+        raw_key = self._key_for(value)
         if raw_key[0] == "indirect":
             definition_key: tuple[Any, ...] = raw_key
             identity = self._identity_for(value, min(nested_locations))
@@ -397,7 +398,7 @@ class _InventoryBuilder:
         definition_key: tuple[Any, ...] | None = None,
         identity: PdfObjectIdentity | None = None,
     ) -> _DefinitionDraft:
-        key = definition_key or object_key(value)
+        key = definition_key or self._key_for(value)
         draft = self.definitions.get(key)
         if draft is None:
             draft = _DefinitionDraft(
@@ -423,7 +424,7 @@ class _InventoryBuilder:
         role: ColorantRole,
         location: str,
     ) -> None:
-        key = object_key(value)
+        key = self._key_for(value)
         overrides = self.role_overrides.setdefault(key, {})
         previous = overrides.get(name, role)
         overrides[name] = values.dominant_role(previous, role)
@@ -438,7 +439,7 @@ class _InventoryBuilder:
             )
 
     def _identity_for(self, value: Any, location: str) -> PdfObjectIdentity:
-        key = object_key(value)
+        key = self._key_for(value)
         identity = self.identities.get(key)
         if identity is not None:
             return identity
@@ -456,12 +457,20 @@ class _InventoryBuilder:
         relative_location: str,
     ) -> PdfObjectIdentity:
         if isinstance(value, (pikepdf.Array, pikepdf.Dictionary, pikepdf.Stream)):
-            key = object_key(value)
+            key = self._key_for(value)
             if key[0] == "indirect":
                 return self._identity_for(value, relative_location)
         return PdfObjectIdentity(
             direct_location=f"{definition_owner.path_anchor}{relative_location}"
         )
+
+    def _key_for(self, value: Any) -> ObjectKey:
+        """Retain direct wrappers so their identity keys cannot be reused."""
+
+        key = object_key(value)
+        if key[0] == "direct":
+            self.direct_objects.append(value)
+        return key
 
     def _add_dependency(
         self,
