@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,7 +31,8 @@ class SpotPdfTests(unittest.TestCase):
         stats = remove_spot(source, output, "DemoSpot")
 
         self.assertTrue(output.exists())
-        self.assertEqual(output.stat().st_mode & 0o777, 0o640)
+        if os.name != "nt":
+            self.assertEqual(output.stat().st_mode & 0o777, 0o640)
         self.assertFalse(check_spot(output, "DemoSpot"))
         self.assertEqual(stats.text_show_operations, 1)
         with pikepdf.open(output) as pdf:
@@ -99,7 +101,8 @@ class SpotPdfTests(unittest.TestCase):
         stats = remove_spot(source, output, "DemoSpot")
 
         self.assertFalse(stats.changed)
-        self.assertEqual(output.stat().st_mode & 0o777, 0o640)
+        if os.name != "nt":
+            self.assertEqual(output.stat().st_mode & 0o777, 0o640)
         self.assertEqual(source.read_bytes(), output.read_bytes())
 
     def test_direct_object_traversal_discovers_every_spot_reliably(self) -> None:
