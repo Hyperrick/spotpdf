@@ -51,8 +51,8 @@ def smoke_archive(archive: Path) -> None:
             raise SystemExit(f"unexpected installed version from {archive.name}")
         if "Varnish" not in before.stdout:
             raise SystemExit(f"demo spot not found with {archive.name}")
-        if "No reachable spot colors found." not in after.stdout:
-            raise SystemExit(f"spots remain after removal with {archive.name}")
+        if "No reachable named colorants found." not in after.stdout:
+            raise SystemExit(f"named colorants remain after removal with {archive.name}")
         print(f"Smoke test passed: {archive.name}")
 
 

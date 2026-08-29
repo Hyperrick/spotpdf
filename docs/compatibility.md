@@ -16,9 +16,34 @@ reachable selected use can be rewritten without guessing at PDF semantics.
 
 ## Read-only inventory
 
-`list` and `check` discover reachable `/Separation` and `/DeviceN` colorant
-names. Discovery does not imply that removal is supported. The `STATUS` column
-records a reason when preflight rejects a colorant.
+`list` discovers reachable `/Separation`, `/DeviceN`/NChannel, and page
+`/SeparationInfo` colorant names. `check --spot` is narrower: it reports only
+spot/removal candidates and legacy standalone Separation targets, not
+process-only DeviceN components. Discovery does not imply that removal is
+supported. The `ROLE` column distinguishes spot, process, `/All`, and `/None`;
+the `STATUS` column records a reason when preflight rejects a colorant.
+
+For NChannel spaces, names in `/Process /Components` are classified as process
+components even when they are arbitrary. Canonical `Cyan`, `Magenta`, `Yellow`,
+and `Black` components are automatically process only for a CMYK NChannel
+process space (`DeviceCMYK` or four-component `ICCBased`). In an RGB or Lab
+NChannel space, a canonical CMYK name not listed in `/Process /Components` is a
+spot. Legacy non-NChannel DeviceN spaces retain the conservative canonical-name
+classification. Nested individual `/Colorants` Separation definitions are
+inventoried, but a redundant definition for a declared process component does
+not turn that component into a spot.
+
+The programmatic report records each Separation/DeviceN definition with an
+indirect object number or deterministic direct-object path and all discovered
+human-readable locations. It also records exact-name dependencies from
+`/Process /Components`, `/Colorants`, `/MixingHints` (`/Solidities`, `/DotGain`,
+and `/PrintingOrder`), page `/SeparationInfo`, printer-mark Form `/Colorants`,
+and TrapNet `/SeparationColorNames`. The `Default` MixingHints entry is not a
+colorant.
+
+These rules follow the DeviceN attributes and process-component semantics in
+the [PDF 1.6 Reference, section 4.5.5](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/pdfreference1.6.pdf)
+and the pre-separated page model in section 10.10.3.
 
 Signed PDFs may be inventoried, but are never rewritten because a full save
 would invalidate signatures.
@@ -28,6 +53,9 @@ would invalidate signatures.
 Removal does not publish output when a selected color occurs in:
 
 - DeviceN or NChannel color spaces;
+- pre-separated page colorants declared through `/SeparationInfo`;
+- supported exact-name prepress dependencies such as NChannel attributes,
+  printer marks, and trap networks;
 - raster or inline images;
 - colored or uncolored patterns;
 - shadings;
@@ -45,9 +73,11 @@ than followed or replaced.
 
 ## Process and reserved names
 
-`remove --all` preserves Separation colorants named `Cyan`, `Magenta`, `Yellow`,
-and `Black`. It also preserves the special PDF names `All` and `None`. The match
-is exact and case-sensitive.
+`remove --all` preserves NChannel process components and Separation colorants
+named `Cyan`, `Magenta`, `Yellow`, and `Black`. It also preserves the special
+PDF names `All` and `None`. The match is exact and case-sensitive. If one name
+is used as both process and spot, automatic removal preserves it rather than
+guessing which plate was intended.
 
 `remove --spot NAME` is explicit: it can remove a Separation named `Black`, but
 still refuses the reserved names `All` and `None`.

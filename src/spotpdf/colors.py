@@ -7,7 +7,7 @@ from typing import Any
 
 import pikepdf
 
-from .model import ColorSpaceInfo, InspectionReport, SpotKind
+from .model import ColorantRole, ColorSpaceInfo, InspectionReport, SpotKind
 from .objects import ObjectTracker
 
 PROCESS_COLORANTS = frozenset({"Cyan", "Magenta", "Yellow", "Black"})
@@ -63,26 +63,23 @@ def parse_color_space(value: Any, resource_name: str | None = None) -> ColorSpac
 
 
 def discover_spot_declarations(pdf: pikepdf.Pdf) -> InspectionReport:
-    """Discover all reachable Separation and DeviceN colorants."""
+    """Compatibility wrapper for the role-aware inventory implementation."""
 
-    report = InspectionReport()
-    tracker = ObjectTracker()
-    for value in walk_pdf_object(pdf.Root, tracker):
-        info = parse_color_space(value)
-        if info.kind is None:
-            continue
-        for colorant in info.colorants:
-            if info.kind is SpotKind.DEVICEN and colorant in PROCESS_COLORANTS:
-                continue
-            summary = report.get_or_create(colorant)
-            summary.kinds.add(info.kind)
-    return report
+    from .inventory import discover_spot_declarations as discover
+
+    return discover(pdf)
 
 
 def all_mode_targets(report: InspectionReport) -> frozenset[str]:
-    """Return named spots removed by --all, excluding process and special names."""
+    """Return unambiguous named spots selected by ``remove --all``."""
 
-    return frozenset(report.spots) - ALL_MODE_PRESERVED_COLORANTS
+    return frozenset(
+        name
+        for name, summary in report.spots.items()
+        if ColorantRole.SPOT in summary.roles
+        and ColorantRole.PROCESS not in summary.roles
+        and name not in ALL_MODE_PRESERVED_COLORANTS
+    )
 
 
 def walk_pdf_object(value: Any, tracker: ObjectTracker) -> Iterator[Any]:

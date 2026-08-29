@@ -12,17 +12,17 @@ from typing import Any
 import pikepdf
 
 from .colors import (
-    PROCESS_COLORANTS,
     SPECIAL_COLORANTS,
     all_mode_targets,
-    discover_spot_declarations,
     remove_spot_resource_aliases_for_spots,
     resource_aliases_for_spots,
     walk_pdf_object,
 )
 from .content import ContentRewriter, GraphicsState
+from .inventory import discover_spot_declarations
 from .model import (
     BatchRemovalResult,
+    ColorantRole,
     InspectionReport,
     InvalidPdfError,
     RemovalStats,
@@ -52,11 +52,11 @@ def inspect_pdf(path: Path) -> InspectionReport:
 
     with _open_strict(path) as pdf:
         report = discover_spot_declarations(pdf)
-        for name, summary in report.spots.items():
+        for name, summary in report.colorants.items():
             if name in SPECIAL_COLORANTS:
                 summary.contexts.add("reserved separation")
                 continue
-            if name in PROCESS_COLORANTS:
+            if ColorantRole.PROCESS in summary.roles:
                 summary.contexts.add("process colorant; preserved by --all")
             stats = RemovalStats()
             try:
@@ -80,7 +80,7 @@ def inspect_pdf(path: Path) -> InspectionReport:
 
 
 def check_spot(path: Path, spot: str) -> bool:
-    """Return whether a colorant is reachable as Separation or DeviceN."""
+    """Return whether a name is a reachable spot or legacy Separation target."""
 
     with _open_strict(path) as pdf:
         return spot in discover_spot_declarations(pdf).spots
