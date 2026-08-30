@@ -349,6 +349,9 @@ caller closes stdout or stderr while a successful mutation is reporting its
 status, the already verified PDF can exist even though the status transport
 returns an I/O failure; see the JSON stream contract for handling guidance.
 
+For causes and safe next actions for common expected failures, see the
+[troubleshooting guide](https://github.com/Hyperrick/spotpdf/blob/main/docs/troubleshooting.md).
+
 ## Supported scope
 
 | PDF construct | `list` / `check` | `rename` | `set-alternate` | `convert` | `remove` |
