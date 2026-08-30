@@ -442,7 +442,7 @@ they do not make the process a sandbox.
 ## Development
 
 ```bash
-uv sync --locked --dev
+uv sync --locked --dev --group release
 uv lock --check
 uv run ruff check .
 uv run ruff format --check .
@@ -450,7 +450,9 @@ uv run python scripts/check_python_size.py
 uv run python -m unittest discover -s tests -v
 artifact_dir="$(mktemp -d)"
 uv build --no-build-isolation --out-dir "$artifact_dir"
-uv run --group release --locked twine check --strict \
+uv run --no-sync python scripts/check_pypi_readme.py \
+  "$artifact_dir"/*.whl "$artifact_dir"/*.tar.gz
+uv run --no-sync twine check --strict \
   "$artifact_dir"/*.whl "$artifact_dir"/*.tar.gz
 uv run python scripts/check_distribution.py "$artifact_dir"
 uv run python scripts/smoke_distributions.py "$artifact_dir"

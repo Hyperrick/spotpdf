@@ -21,8 +21,10 @@ All notable user-visible changes are documented here. The project follows
 - A tokenless PyPI Trusted Publishing path uploads the already tested wheel and
   source archive only after the corresponding GitHub Release is immutable.
 - Release validation now rejects repository-relative or stale-tag README links
-  that would break on PyPI, and `twine check --strict` validates both built
-  distributions' metadata and long description.
+  that would break on PyPI. A fail-closed PyPI Markdown gate renders the exact
+  long description packaged in both distributions and requires them to match;
+  bounded archive parsing rejects resource floods and ambiguous metadata paths.
+  `twine check --strict` remains responsible for metadata and warning checks.
 - Every mutating CLI command now accepts `--dry-run` instead of an output path.
   The mode executes the complete rewrite, serialization, strict reopen, and
   semantic verification pipeline, then discards the verified temporary PDF.
