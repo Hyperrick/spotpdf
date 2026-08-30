@@ -3,12 +3,38 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any
 
 import pikepdf
 
 from .colors import pdf_name, resolve_color_space
+from .content_support import (
+    CLIP_TEXT_MODES,
+    FILL_TEXT_MODES,
+    STROKE_TEXT_MODES,
+    TEXT_SHOW_OPERATORS,
+    GraphicsState,
+    color_object_colorants,
+)
+from .content_support import (
+    find_text_end as _find_text_end,
+)
+from .content_support import (
+    instruction as _instruction,
+)
+from .content_support import (
+    named_resource as _named_resource,
+)
+from .content_support import (
+    operator_name as _operator_name,
+)
+from .content_support import (
+    render_mode as _render_mode,
+)
+from .content_support import (
+    resource_dictionary as _resource_dictionary,
+)
 from .model import (
     ColorSpaceInfo,
     InvalidPdfError,
@@ -17,25 +43,7 @@ from .model import (
     UnsupportedSpotUseError,
 )
 
-Instruction = pikepdf.ContentStreamInstruction
 FormHandler = Callable[[Any, "GraphicsState"], None]
-
-TEXT_SHOW_OPERATORS = {"Tj", "TJ", "'", '"'}
-FILL_TEXT_MODES = {0, 2, 4, 6}
-STROKE_TEXT_MODES = {1, 2, 5, 6}
-CLIP_TEXT_MODES = {4, 5, 6, 7}
-
-
-@dataclass
-class GraphicsState:
-    """Subset of PDF graphics state relevant to named-color paint."""
-
-    nonstroking: ColorSpaceInfo = ColorSpaceInfo()
-    stroking: ColorSpaceInfo = ColorSpaceInfo()
-    text_render_mode: int = 0
-
-    def clone(self) -> GraphicsState:
-        return replace(self)
 
 
 @dataclass
@@ -385,65 +393,9 @@ def _text_action(state: GraphicsState, targets: frozenset[str]) -> object | int 
     return _render_mode(remaining_fill, remaining_stroke, False)
 
 
-def _render_mode(fill: bool, stroke: bool, clip: bool) -> int:
-    modes = {
-        (True, False, False): 0,
-        (False, True, False): 1,
-        (True, True, False): 2,
-        (False, False, False): 3,
-        (True, False, True): 4,
-        (False, True, True): 5,
-        (True, True, True): 6,
-        (False, False, True): 7,
-    }
-    return modes[(fill, stroke, clip)]
-
-
-def _instruction(operator: str, *operands: Any) -> Instruction:
-    return Instruction(list(operands), pikepdf.Operator(operator))
-
-
-def _operator_name(item: Any) -> str:
-    try:
-        return str(item.operator)
-    except AttributeError:
-        return "INLINE IMAGE"
-
-
-def _find_text_end(instructions: Sequence[Any], start: int) -> int:
-    for index in range(start + 1, len(instructions)):
-        operator = _operator_name(instructions[index])
-        if operator == "BT":
-            raise InvalidPdfError("nested BT text object")
-        if operator == "ET":
-            return index
-    raise InvalidPdfError("BT without matching ET")
-
-
 def _state_uses_target(state: GraphicsState, targets: frozenset[str]) -> bool:
     return state.nonstroking.contains_any(targets) or state.stroking.contains_any(targets)
 
 
-def _resource_dictionary(resources: Any, name: str) -> Any | None:
-    if not isinstance(resources, (pikepdf.Dictionary, pikepdf.Stream)):
-        return None
-    return resources.get(pikepdf.Name(name), None)
-
-
-def _named_resource(dictionary: Any, name: Any) -> Any | None:
-    if not isinstance(dictionary, (pikepdf.Dictionary, pikepdf.Stream)):
-        return None
-    return dictionary.get(pikepdf.Name(f"/{pdf_name(name)}"), None)
-
-
 def _color_object_contains(value: Any, resources: Any, targets: frozenset[str]) -> bool:
-    if isinstance(value, pikepdf.Name):
-        return resolve_color_space(resources, value).contains_any(targets)
-    if not isinstance(value, pikepdf.Array) or not value:
-        return False
-    family = pdf_name(value[0])
-    if family == "Separation" and len(value) >= 2:
-        return pdf_name(value[1]) in targets
-    if family == "DeviceN" and len(value) >= 2 and isinstance(value[1], pikepdf.Array):
-        return not targets.isdisjoint(pdf_name(name) for name in value[1])
-    return False
+    return not targets.isdisjoint(color_object_colorants(value, resources))

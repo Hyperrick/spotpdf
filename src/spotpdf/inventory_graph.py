@@ -90,7 +90,15 @@ def _object_edges(value: Any) -> tuple[tuple[str, Any], ...]:
 
     if isinstance(value, pikepdf.Array):
         return tuple((f"[{index}]", child) for index, child in enumerate(value))
-    return tuple((f" {path_name(name)}", child) for name, child in value.items())
+    is_page_tree_node = value.get(pikepdf.Name.Type, None) in (
+        pikepdf.Name.Page,
+        pikepdf.Name.Pages,
+    )
+    return tuple(
+        (f" {path_name(name)}", child)
+        for name, child in value.items()
+        if not (is_page_tree_node and name == pikepdf.Name.Parent)
+    )
 
 
 def _resource_roots(pdf: pikepdf.Pdf) -> list[tuple[Any, tuple[_GraphContext, ...]]]:

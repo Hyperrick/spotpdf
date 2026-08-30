@@ -160,6 +160,20 @@ the `STATUS` column records removal-preflight context. `rename` and
 `set-alternate` run their own target-specific structural and hazard preflights
 after inventory.
 
+Inventory scans removal hazards once and interprets every reached page or
+compatible Form content stream once, collecting independent counters for all
+active colorants. One colorant's first unsupported use freezes only that
+colorant; already completed pages and paint counters remain visible while other
+colorants continue. A compatible shared Form contributes paint operations once
+and appears in every page that invokes it. Direct Form resource dictionaries use
+a stable owner-bound identity, so repeated inspection does not depend on
+temporary pikepdf wrapper objects. The reproducible work and memory contract is
+in [performance.md](performance.md).
+
+Only page-tree `/Parent` back-links are treated as redundant during semantic
+inventory. A `/Parent` key in any non-page dictionary is still traversed and
+can contribute named-color declarations or dependencies.
+
 For NChannel spaces, names in `/Process /Components` are classified as process
 components even when they are arbitrary. Canonical `Cyan`, `Magenta`, `Yellow`,
 and `Black` components are automatically process only for a CMYK NChannel
@@ -202,6 +216,12 @@ Removal does not publish output when a selected color occurs in:
 - clipping text;
 - image masks painted through an inherited selected color;
 - Forms that require context-dependent rewriting.
+
+An inline image anywhere in a page stream blocks removal for every selected
+spot resource declared by that page, even when the alias is not painted. A Form
+containing an inline image also fails during the dry run when its supported
+rewrite would otherwise change that stream. This conservative rule prevents
+unsafe content-stream reserialization.
 
 Malformed content, unknown resources, cyclic Forms, Forms nested deeper than 64
 levels, encryption, modification restrictions, and signatures also block

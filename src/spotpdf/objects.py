@@ -19,6 +19,15 @@ def object_key(obj: Any) -> ObjectKey:
     return ("direct", id(obj))
 
 
+def anchored_object_key(obj: Any, anchor: tuple[Any, ...]) -> tuple[Any, ...]:
+    """Return stable identity for indirect objects and anchored direct values."""
+
+    key = object_key(obj)
+    if key[0] == "indirect":
+        return key
+    return ("direct-at", *anchor)
+
+
 class ObjectTracker:
     """Track visited objects and retain direct wrappers to prevent id reuse."""
 

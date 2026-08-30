@@ -39,6 +39,19 @@ jobs:
         run: uv run ruff format --check .
       - name: Enforce module size limit
         run: uv run python scripts/check_python_size.py
+      - name: Verify inventory work and memory contract
+        run: >-
+          uv run python scripts/benchmark_inventory.py
+          --runs 3
+          --output "$RUNNER_TEMP/inventory-benchmark.json"
+      - name: Upload inventory benchmark
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: inventory-benchmark-${{ github.sha }}
+          path: ${{ runner.temp }}/inventory-benchmark.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
 
   test:
     name: Test / ${{ matrix.os }} / Python ${{ matrix.python }}

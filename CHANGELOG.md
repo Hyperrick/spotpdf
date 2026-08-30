@@ -12,6 +12,30 @@ All notable user-visible changes are documented here. The project follows
   the spot plate and all paint operands.
 - A real veraPDF public-corpus case and synthetic before/after render for
   alternate-preview changes.
+- A reproducible synthetic 64/128-spot inventory benchmark with deterministic
+  page/Form parse counts, timings, and Python heap measurements.
+
+### Changed
+
+- Read-only inventory now attributes structural hazards in one traversal and
+  interprets every reached page or compatible Form stream once, eliminating the
+  previous colorant-by-stream parse multiplier while preserving per-colorant
+  status and paint counters.
+
+### Fixed
+
+- Shared Forms with direct resource dictionaries now use stable owner-bound
+  identities instead of transient pikepdf wrapper IDs, and compatible shared
+  Form use is attributed to every calling page without recounting its paint.
+- Cached changes from nested shared Forms now propagate through every enclosing
+  Form, so removal reports every affected calling page even when the inner Form
+  was first reached through another path.
+- Inline images are recognized with current pikepdf objects. Page aliases and
+  Form streams that would require rewriting now fail during the dry run rather
+  than reaching an unsafe apply pass.
+- Page-tree `/Parent` back-links and shared resource-hazard subtrees are handled
+  without repeated cross-expansion, keeping inventory linear as pages, Forms,
+  and aliases grow while preserving non-page `/Parent` reachability.
 
 ### Safety
 
