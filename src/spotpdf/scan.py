@@ -13,6 +13,7 @@ from .colors import (
     resolve_color_space,
 )
 from .inventory import discover_spot_declarations
+from .inventory_graph import walk_reachable
 from .model import (
     InspectionReport,
     InvalidPdfError,
@@ -21,6 +22,7 @@ from .model import (
     UnsupportedSpotUseError,
 )
 from .objects import ObjectTracker
+from .rename_hazards import inspect_target_hazards
 
 MAX_FORM_NESTING = 64
 
@@ -110,6 +112,28 @@ def validate_spot_uses_for_removal(
         resources = page.obj.get(pikepdf.Name.Resources, pikepdf.Dictionary())
         _validate_resources(resources, spots, f"page {page_number}", seen_forms)
 
+    for visit in walk_reachable(pdf):
+        value = visit.value
+        inspect_target_hazards(
+            value,
+            visit.locations,
+            spots,
+            operation="spot removal or conversion",
+        )
+        if (
+            not isinstance(value, pikepdf.Stream)
+            or value.get(pikepdf.Name.Subtype, None) != pikepdf.Name.Form
+            or not seen_forms.visit(value)
+            or pikepdf.Name.Resources not in value
+        ):
+            continue
+        _validate_resources(
+            value.get(pikepdf.Name.Resources, None),
+            spots,
+            f"uninvoked Form at {min(visit.locations)}",
+            seen_forms,
+        )
+
 
 def _validate_resources(
     resources: Any,
@@ -148,7 +172,16 @@ def _validate_resources(
         if not isinstance(entries, pikepdf.Dictionary):
             continue
         for name, value in entries.items():
-            if _subtree_contains_spots(value, spots, ObjectTracker()):
+            contains_spot = _subtree_contains_spots(value, spots, ObjectTracker())
+            if (
+                category == pikepdf.Name.Shading
+                and isinstance(value, (pikepdf.Dictionary, pikepdf.Stream))
+                and pikepdf.Name.ColorSpace in value
+            ):
+                contains_spot |= _color_value_contains_spots(
+                    value[pikepdf.Name.ColorSpace], resources, spots
+                )
+            if contains_spot:
                 raise UnsupportedSpotUseError(
                     f"{context}: spot color in {label} {pdf_name(name)!r} is not supported"
                 )
@@ -157,7 +190,17 @@ def _validate_resources(
     if isinstance(fonts, pikepdf.Dictionary):
         for name, font in fonts.items():
             subtype = pdf_name(font.get(pikepdf.Name.Subtype, pikepdf.Name("/Unknown")))
-            if subtype == "Type3" and _subtree_contains_spots(font, spots, ObjectTracker()):
+            inherited_target_resources = (
+                subtype == "Type3"
+                and pikepdf.Name.Resources not in font
+                and isinstance(color_spaces, pikepdf.Dictionary)
+                and any(
+                    parse_color_space(value).contains_any(spots) for value in color_spaces.values()
+                )
+            )
+            if subtype == "Type3" and (
+                inherited_target_resources or _subtree_contains_spots(font, spots, ObjectTracker())
+            ):
                 raise UnsupportedSpotUseError(
                     f"{context}: spot color in Type3 font {pdf_name(name)!r} is not supported"
                 )
@@ -177,10 +220,7 @@ def _validate_resources(
     for name, xobject in xobjects.items():
         subtype = pdf_name(xobject.get(pikepdf.Name.Subtype, pikepdf.Name("/Unknown")))
         if subtype == "Image":
-            color_space = xobject.get(pikepdf.Name.ColorSpace, None)
-            if color_space is not None and _color_value_contains_spots(
-                color_space, resources, spots
-            ):
+            if _image_subtree_contains_spots(xobject, resources, spots):
                 raise UnsupportedSpotUseError(
                     f"{context}: spot-color image {pdf_name(name)!r} is not supported"
                 )
@@ -255,4 +295,29 @@ def _color_value_contains_spots(value: Any, resources: Any, spots: frozenset[str
         if parse_color_space(current).contains_any(spots):
             return True
         stack.extend(current)
+    return False
+
+
+def _image_subtree_contains_spots(
+    value: Any,
+    resources: Any,
+    spots: frozenset[str],
+) -> bool:
+    tracker = ObjectTracker()
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if not isinstance(current, (pikepdf.Array, pikepdf.Dictionary, pikepdf.Stream)):
+            continue
+        if not tracker.visit(current):
+            continue
+        if isinstance(current, (pikepdf.Dictionary, pikepdf.Stream)):
+            color_space = current.get(pikepdf.Name.ColorSpace, None)
+            if color_space is not None and _color_value_contains_spots(
+                color_space, resources, spots
+            ):
+                return True
+            stack.extend(current.values())
+        else:
+            stack.extend(current)
     return False

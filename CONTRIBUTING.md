@@ -29,12 +29,16 @@ uv run python -m unittest discover -s tests -v
 Before submitting a pull request, run:
 
 ```bash
+uv lock --check
 uv run ruff check .
 uv run ruff format --check .
+uv run python scripts/check_python_size.py
 uv run python -m unittest discover -s tests -v
 uv run python scripts/benchmark_inventory.py --runs 3
-uv build --no-build-isolation
-uv run python scripts/check_distribution.py dist
+artifact_dir="$(mktemp -d)"
+uv build --no-build-isolation --out-dir "$artifact_dir"
+uv run python scripts/check_distribution.py "$artifact_dir"
+uv run python scripts/smoke_distributions.py "$artifact_dir"
 ```
 
 Maintainers should also run the hash-pinned public corpus before a release:

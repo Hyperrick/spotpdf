@@ -1,10 +1,11 @@
 # Public prepress corpus gate
 
 The unit suite creates every PDF fixture at runtime. A separate release gate
-tests `spotpdf` against six public prepress PDFs without committing third-party
-PDFs to this repository. [`corpus/manifest.toml`](../corpus/manifest.toml) pins
-each upstream commit, raw URL, byte size, SHA-256 digest, license, and expected
-operation.
+tests `spotpdf` against seven pinned cases from six distinct public prepress
+PDFs without committing third-party PDFs to this repository.
+[`corpus/manifest.toml`](../corpus/manifest.toml) pins each upstream commit, raw
+URL, byte size, SHA-256 digest, license, and expected operation. One veraPDF
+input is intentionally exercised twice with different operations.
 
 ## Coverage
 
@@ -12,6 +13,7 @@ operation.
 | --- | --- | --- |
 | Ghostscript `examples/spots2.pdf` | AGPL-3.0-or-later | `remove --all` removes three painted custom plates. |
 | veraPDF t01-pass-b | CC BY 4.0 | `set-alternate` preserves the spot plate while changing the composite preview. |
+| veraPDF t01-pass-b | CC BY 4.0 | `convert` removes `Custom`, keeps an equivalent Poppler composite, and removes the Ghostscript spot plate. |
 | veraPDF t01-pass-c | CC BY 4.0 | DeviceN components and `/Colorants` dependencies rename together. |
 | veraPDF t01-pass-f | CC BY 4.0 | Rename preserves a DeviceRGB alternate and composite appearance. |
 | veraPDF t02-pass-a | CC BY 4.0 | `remove --all` preserves arbitrary NChannel process components as a byte-identical no-op. |
@@ -55,6 +57,7 @@ plates with Ghostscript `tiffsep`, and validates the post-operation inventory.
 Rename cases additionally require all Poppler-rendered pages to remain
 byte-for-byte equal within the same run. The alternate-preview case requires
 the composite to change while the Ghostscript separation plate set stays
-identical. The gate deliberately does not store golden raster hashes, because
-different RIP versions may produce different but internally consistent raster
-files.
+identical. The conversion case requires an equivalent Poppler composite while
+the converted Ghostscript spot plate disappears. The gate deliberately does not
+store golden raster hashes, because different RIP versions may produce
+different but internally consistent raster files.

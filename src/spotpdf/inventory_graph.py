@@ -10,6 +10,7 @@ import pikepdf
 
 from .inventory_values import path_name
 from .objects import ObjectKey, object_key
+from .trailer_semantics import semantic_trailer_items
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,22 @@ class _GraphContext:
 def walk_reachable(pdf: pikepdf.Pdf) -> Iterator[GraphVisit]:
     """Yield containers once per root context while caching graph edges."""
 
+    yield from _walk_reachable(pdf, _standard_roots(pdf))
+
+
+def walk_reachable_with_trailer_roots(pdf: pikepdf.Pdf) -> Iterator[GraphVisit]:
+    """Also traverse every non-storage trailer root as an owner context."""
+
+    roots = [*_standard_roots(pdf), *_additional_semantic_trailer_roots(pdf)]
+    yield from _walk_reachable(pdf, roots)
+
+
+def _walk_reachable(
+    pdf: pikepdf.Pdf,
+    roots: list[tuple[Any, tuple[_GraphContext, ...]]],
+) -> Iterator[GraphVisit]:
+    """Traverse caller-selected roots without changing inventory reachability."""
+
     expanded: set[tuple[ObjectKey, str]] = set()
     edges: dict[ObjectKey, tuple[tuple[str, Any], ...]] = {}
     direct_objects: list[Any] = []
@@ -40,10 +57,7 @@ def walk_reachable(pdf: pikepdf.Pdf) -> Iterator[GraphVisit]:
         object_key(page.obj): f"page {page_number}"
         for page_number, page in enumerate(pdf.pages, start=1)
     }
-    stack = [
-        (pdf.Root, (_GraphContext("catalog", "catalog"),)),
-        *_resource_roots(pdf),
-    ]
+    stack = roots
     while stack:
         current, contexts = stack.pop()
         if not isinstance(current, (pikepdf.Array, pikepdf.Dictionary, pikepdf.Stream)):
@@ -83,6 +97,28 @@ def walk_reachable(pdf: pikepdf.Pdf) -> Iterator[GraphVisit]:
             for segment, value in object_edges
         ]
         stack.extend(reversed(children))
+
+
+def _standard_roots(pdf: pikepdf.Pdf) -> list[tuple[Any, tuple[_GraphContext, ...]]]:
+    """Return the historical inventory roots unchanged."""
+
+    return [
+        (pdf.Root, (_GraphContext("catalog", "catalog"),)),
+        *_resource_roots(pdf),
+    ]
+
+
+def _additional_semantic_trailer_roots(
+    pdf: pikepdf.Pdf,
+) -> list[tuple[Any, tuple[_GraphContext, ...]]]:
+    """Return semantic trailer values not already represented by the catalog root."""
+
+    return [
+        (value, (_GraphContext(location, location),))
+        for key, value in semantic_trailer_items(pdf)
+        if key != pikepdf.Name.Root
+        for location in (f"trailer {path_name(key)}",)
+    ]
 
 
 def _object_edges(value: Any) -> tuple[tuple[str, Any], ...]:

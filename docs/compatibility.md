@@ -143,6 +143,104 @@ The Separation array and tint-function semantics follow ISO 32000-1 sections
 8.6.6.4 and 7.10.3 in the
 [official Adobe-hosted specification](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
 
+## Supported explicit DeviceCMYK conversion
+
+`convert` replaces one exact, case-sensitive named Separation with explicit
+DeviceCMYK paint:
+
+```console
+spotpdf convert input.pdf --spot "Varnish" --to-cmyk 0,80,100,0 -o output.pdf
+```
+
+The target must be an unambiguous true spot with at least one reachable valid
+Separation definition. The four recipe values are finite percentages in the
+inclusive range 0–100. The existing alternate color space and tint function
+must be structurally valid, but they are never used to calculate the output.
+Source tints must be numeric values in the inclusive range `0..1`; invalid
+values are rejected, not clamped. For every target tint `t`, the command writes:
+
+```text
+t*C  t*M  t*Y  t*K  k    % set nonstroking DeviceCMYK state
+t*C  t*M  t*Y  t*K  K    % set stroking DeviceCMYK state
+```
+
+Here `C`, `M`, `Y`, and `K` are the requested recipe normalized to `0..1`.
+`/Ink cs` becomes the full recipe plus `k`, and `/Ink CS` becomes the full
+recipe plus `K`, because selecting a Separation establishes its initial tint
+`1`. A later lowercase `scn` changes only nonstroking state; uppercase `SCN`
+changes only stroking state. For example, `/Ink cs 0.2 SCN` does not make the
+uppercase tint belong to the previously selected fill spot. Fill and stroke
+state stay independent across balanced `q`/`Q` scopes.
+
+`k` and `K` select and set DeviceCMYK color state; they are not path or text
+paint operators. The existing path, text-show, geometry, clipping, and
+supported unrelated graphics-state operators remain unchanged. Requested
+recipes and scaled tints are serialized with PDF-number precision.
+
+The command supports opaque vector/path and non-Type3 text paint plus nested
+Form XObjects whose resource and caller contexts require one consistent
+rewrite. It rewrites only logical page/Form content sequences that need
+conversion, removes the exact target aliases and Separation definitions proven
+unused by the result, and preserves unrelated spots. A saved candidate is
+strictly reopened;
+the target must be absent and the complete document fingerprint must match the
+planned resource and stream edits before atomic publication.
+
+This operation changes print semantics: the named plate no longer exists and
+the paint contributes to the process plates instead. `--to-cmyk` is an explicit
+operator decision, not color conversion. `spotpdf` does not evaluate arbitrary
+tint functions, perform an ICC-based conversion, change `/OutputIntents`, or
+infer a process recipe from the old composite preview. Existing output intents
+can still characterize or color-manage the newly explicit DeviceCMYK values. A
+composite render is expected to match only when the supplied recipe and the
+renderer's color handling actually match the old preview.
+
+## Conversion fail-closed cases
+
+Conversion publishes no output when the target is absent, ambiguous, reserved,
+canonical process color, process-only, mixed process/spot, DeviceN/NChannel, or
+present in an unsupported exact-name dependency. The initial subset also
+rejects target-related or context-relevant:
+
+- raster images and their print-default alternates, image masks, inline images
+  in a stream that would change, patterns, shadings, and unknown XObject
+  subtypes;
+- Type 3 fonts and CharProcs (including fonts selected through ExtGState),
+  annotation appearances, soft masks, transparency groups, non-normal blend
+  modes, non-opaque alpha, effective overprint, and non-knockout text;
+- Type 5 halftone colorant keys, OPI `/Inks`, and other unsupported exact-name
+  prepress dependencies;
+- any surviving reference to a target resource alias, including Indexed or
+  Pattern bases, Separation/DeviceN alternates, ICCBased alternates, image or
+  shading color spaces, transparency-group `/CS`, and Tiling Pattern content;
+- `/DefaultCMYK` overrides effective where target state is generated or
+  inherited, because they would remap the explicit `k`/`K` output;
+- unsupported target `sc`/`SC` paint, malformed color operators, invalid font
+  state, unresolved resources, unknown color-space state, and unknown content
+  operators outside `BX`/`EX` compatibility sections;
+- shared Forms that require different rewritten bytes, inherited-resource Forms
+  that cannot be proven safe, cyclic Forms, and nesting deeper than 64 levels;
+- a planned Page stream with any owner outside its Page `/Contents` slot, a
+  planned Form stream with a non-content owner, or any stream shared between
+  Page and Form roles, whose effective resources can differ;
+- a changed `/Contents` Array with an externally referenced member stream,
+  because conversion consolidates the logical sequence into the first member;
+- Form ownership that is not a direct `/XObject` entry in resources proven to
+  belong to an actual Page/Form content context. External owners include
+  standards-valid catalog `/StructTreeRoot /K` MCR `/Stm` associations as well
+  as lookalike resource or MCR shapes in `/PieceInfo` and private data; and
+- encryption, modification restrictions, signatures, parser warnings, unsafe
+  output aliases, or any in-memory/post-save semantic mismatch.
+
+Neutral graphics state that does not change the target paint semantics is
+accepted. The refusal is evaluated against reachable resource and content
+contexts, including resources that are declared but never invoked, so deleting
+the target alias cannot leave a stale reference behind.
+
+The color-state and special-color semantics follow ISO 32000-1 sections 8.6.4
+and 8.6.6.4 in the
+[official Adobe-hosted specification](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
+
 ## Supported removal
 
 - Exact, case-sensitive named `/Separation` resources.
@@ -159,11 +257,12 @@ The Separation array and tint-function semantics follow ISO 32000-1 sections
 `list` discovers reachable `/Separation`, `/DeviceN`/NChannel, and page
 `/SeparationInfo` colorant names. `check --spot` is narrower: it reports only
 spot/removal candidates and legacy standalone Separation targets, not
-process-only DeviceN components. Discovery does not imply that removal is
+process-only DeviceN components. Discovery does not imply that mutation is
 supported. The `ROLE` column distinguishes spot, process, `/All`, and `/None`;
 the `STATUS` column records removal-preflight context. `rename` and
-`set-alternate` run their own target-specific structural and hazard preflights
-after inventory.
+`set-alternate` run their own target-specific structural and hazard preflights;
+`convert` additionally plans every target resource deletion and page/Form
+stream replacement before applying either kind of edit.
 
 Inventory scans removal hazards once and interprets every reached page or
 compatible Form content stream once, collecting independent counters for all
@@ -261,7 +360,7 @@ The committed suite generates minimal PDFs at runtime with pikepdf. The README
 demo is generated by project-owned code. No customer PDFs or third-party PDF
 fixtures are committed.
 
-The release-only [public corpus gate](public-corpus.md) downloads six
+The release-only [public corpus gate](public-corpus.md) downloads seven
 commit-pinned, SHA-256-verified Ghostscript and veraPDF files into an ignored
 cache, records their licenses and attribution, then checks them with qpdf,
 Poppler, and Ghostscript `tiffsep`. A fixture is vendored only when its license

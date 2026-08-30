@@ -66,12 +66,12 @@ tokens of an inline-image sequence each count. It does not count only paint
 operators: state, path-construction, text, and compatibility operators consume
 the same budget.
 
-One fresh counter set is used per public library call. Internal removal dry
-runs, apply passes, and saved-output verification do not accumulate against the
-source limits a second time. This keeps the contract independent of the fixed
-number of verification passes. Saved output is not a second independently
-budgeted input; use an external output/temp-disk ceiling where that distinction
-matters.
+One fresh counter set is used per public library call. Internal mutation
+planning, dry runs, apply passes, and saved-output verification do not
+accumulate against the source limits a second time. This keeps the contract
+independent of the fixed number of verification passes. Saved output is not a
+second independently budgeted input; use an external output/temp-disk ceiling
+where that distinction matters.
 
 ## CLI overrides
 
@@ -99,7 +99,7 @@ remains byte-for-byte unchanged, and no private temporary candidate remains.
 
 `ProcessingLimits` is immutable and accepted as the keyword-only `limits=`
 argument by `inspect_pdf`, `check_spot`, `remove_spot`, `remove_all_spots`,
-`rename_spot`, and `set_alternate_cmyk`.
+`rename_spot`, `set_alternate_cmyk`, and `convert_spot_to_cmyk`.
 `DEFAULT_PROCESSING_LIMITS` is the exported immutable instance used when the
 argument is omitted.
 

@@ -12,16 +12,16 @@ class PublicCorpusManifestTests(unittest.TestCase):
         self.repository = Path(__file__).resolve().parents[1]
         self.cases = load_manifest(self.repository / "corpus" / "manifest.toml")
 
-    def test_manifest_covers_remove_rename_alternate_and_process_cases(self) -> None:
-        self.assertEqual(len(self.cases), 6)
+    def test_manifest_covers_remove_rename_alternate_convert_and_process_cases(self) -> None:
+        self.assertEqual(len(self.cases), 7)
         self.assertEqual(
             {case.operation for case in self.cases},
-            {"remove-all", "rename", "set-alternate"},
+            {"remove-all", "rename", "set-alternate", "convert"},
         )
         self.assertTrue(any(case.same_composite for case in self.cases))
         self.assertTrue(any(case.different_composite for case in self.cases))
         self.assertTrue(any(case.byte_identical for case in self.cases))
-        self.assertEqual(sum(case.size for case in self.cases), 910891)
+        self.assertEqual(sum(case.size for case in self.cases), 1_403_253)
 
     def test_offline_mode_rejects_missing_or_unverified_files(self) -> None:
         case = self.cases[0]

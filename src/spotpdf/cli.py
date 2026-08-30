@@ -10,6 +10,7 @@ import pikepdf
 
 from .alternate import parse_cmyk_percentages, set_alternate_cmyk
 from .cli_limits import add_processing_limit_arguments, processing_limits_from_args
+from .convert import convert_spot_to_cmyk
 from .document import check_spot, inspect_pdf, remove_all_spots, remove_spot
 from .model import BatchRemovalResult, RemovalStats, SpotPdfError, __version__
 from .rename import rename_spot
@@ -91,12 +92,42 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace an existing output after validation",
     )
+
+    convert_parser = commands.add_parser(
+        "convert",
+        help="replace supported Separation paint with explicit DeviceCMYK values",
+        description=(
+            "Remove one exact, case-sensitive Separation plate by replacing supported paint "
+            "with an operator-supplied DeviceCMYK recipe. The recipe is not inferred from "
+            "the alternate color or an ICC profile."
+        ),
+    )
+    convert_parser.add_argument("input", type=Path, help="input PDF")
+    convert_parser.add_argument(
+        "--spot",
+        required=True,
+        help="exact, case-sensitive spot name whose plate will be removed",
+    )
+    convert_parser.add_argument(
+        "--to-cmyk",
+        required=True,
+        type=parse_cmyk_percentages,
+        metavar="C,M,Y,K",
+        help="operator-supplied C,M,Y,K percentages in the inclusive range 0..100",
+    )
+    convert_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
+    convert_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace an existing output after validation",
+    )
     for command_parser in (
         list_parser,
         check_parser,
         remove_parser,
         rename_parser,
         alternate_parser,
+        convert_parser,
     ):
         add_processing_limit_arguments(command_parser)
     return parser
@@ -164,6 +195,28 @@ def main(argv: list[str] | None = None) -> int:
                 f"DeviceCMYK {cmyk} in {result.definitions_changed} Separation "
                 "definition(s); spot name, plate identity, content streams, and paint "
                 f"operands preserved; no process conversion performed; output: {args.output}"
+            )
+            return 0
+        if args.command == "convert":
+            result = convert_spot_to_cmyk(
+                args.input,
+                args.output,
+                args.spot,
+                args.to_cmyk,
+                force=args.force,
+                limits=limits,
+            )
+            cmyk = ",".join(f"{value:g}" for value in result.cmyk_percentages)
+            pages = ",".join(str(page) for page in result.pages_affected) or "none"
+            print(
+                f"Converted {result.spot!r} paint to explicit DeviceCMYK {cmyk}; "
+                f"rewrote {_count(result.color_operators_rewritten, 'color operator')} in "
+                f"{_count(result.page_content_sequences_changed, 'page content sequence')} "
+                f"and {_count(result.forms_changed, 'Form')}; removed "
+                f"{_count(result.definitions_removed, 'Separation definition')} through "
+                f"{_count(result.resources_removed, 'resource alias')}; "
+                f"pages affected: {pages}; "
+                f"output: {args.output}"
             )
             return 0
     except (SpotPdfError, pikepdf.PdfError, OSError, TypeError, ValueError) as error:

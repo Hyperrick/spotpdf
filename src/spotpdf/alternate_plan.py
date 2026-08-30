@@ -10,6 +10,7 @@ from typing import Any
 import pikepdf
 
 from .alternate_validation import reject_inline_target_definitions, validate_existing_preview
+from .cmyk import NormalizedCmyk, canonical_pdf_number, canonicalize_normalized_cmyk
 from .colors import PROCESS_COLORANTS, SPECIAL_COLORANTS
 from .inventory_graph import walk_reachable
 from .inventory_values import name_or_string, name_value
@@ -23,8 +24,6 @@ from .model import (
 )
 from .rename_hazards import devicen_target_mentions, name_field_mentions
 from .rename_slots import semantic_object_fingerprint, semantic_pdf_fingerprint
-
-NormalizedCmyk = tuple[float, float, float, float]
 
 
 @dataclass
@@ -257,7 +256,7 @@ class _PlanBuilder:
 
 
 def _linear_cmyk_function(cmyk: NormalizedCmyk) -> pikepdf.Dictionary:
-    full_tone = tuple(_canonical_pdf_component(value) for value in cmyk)
+    full_tone = tuple(canonical_pdf_number(value) for value in cmyk)
     return pikepdf.Dictionary(
         FunctionType=2,
         Domain=pikepdf.Array([0, 1]),
@@ -266,11 +265,6 @@ def _linear_cmyk_function(cmyk: NormalizedCmyk) -> pikepdf.Dictionary:
         C1=pikepdf.Array(full_tone),
         N=1,
     )
-
-
-def _canonical_pdf_component(value: float):
-    component = pikepdf.Array([value])[0]
-    return int(component) if component in {0, 1} else component
 
 
 def build_alternate_plan(
@@ -282,13 +276,6 @@ def build_alternate_plan(
     """Build a complete preview mutation plan without changing the PDF."""
 
     return _PlanBuilder(pdf, report, spot, canonicalize_normalized_cmyk(cmyk)).build()
-
-
-def canonicalize_normalized_cmyk(cmyk: NormalizedCmyk) -> NormalizedCmyk:
-    """Round normalized components exactly as pikepdf will store PDF numbers."""
-
-    values = tuple(float(_canonical_pdf_component(value)) for value in cmyk)
-    return values[0], values[1], values[2], values[3]
 
 
 __all__ = [

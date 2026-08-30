@@ -22,7 +22,7 @@ def run(
 
 
 def create_docs_images(repository: Path) -> None:
-    """Create removal/preview renders and the rename terminal walkthrough."""
+    """Create synthetic render comparisons and mutation walkthroughs."""
 
     renderer = shutil.which("pdftoppm")
     if renderer is None:
@@ -35,6 +35,7 @@ def create_docs_images(repository: Path) -> None:
         source = root / "demo.pdf"
         renamed = root / "renamed.pdf"
         alternate = root / "alternate.pdf"
+        converted = root / "converted.pdf"
         removed = root / "removed.pdf"
         generator = repository / "examples" / "create_demo_pdf.py"
 
@@ -66,22 +67,45 @@ def create_docs_images(repository: Path) -> None:
         alternate_inventory = _spotpdf(repository, "list", str(alternate)).stdout
         if alternate_inventory != before:
             raise SystemExit("set-alternate documentation inventory changed")
+        convert_result = _spotpdf(
+            repository,
+            "convert",
+            str(source),
+            "--spot",
+            "Varnish",
+            "--to-cmyk",
+            "0,62,0,0",
+            "-o",
+            str(converted),
+        ).stdout
+        converted_inventory = _spotpdf(repository, "list", str(converted)).stdout
+        if "Varnish\t" in converted_inventory:
+            raise SystemExit("convert documentation output still has the Varnish spot")
+        if "CutContour\t" not in converted_inventory:
+            raise SystemExit("convert documentation output lost an unrelated spot")
         _spotpdf(repository, "remove", str(source), "--all", "-o", str(removed))
 
         before_png = _render(renderer, source, root / "before")
         renamed_png = _render(renderer, renamed, root / "renamed")
         alternate_png = _render(renderer, alternate, root / "alternate")
+        converted_png = _render(renderer, converted, root / "converted")
         removed_png = _render(renderer, removed, root / "after")
         if before_png.read_bytes() != renamed_png.read_bytes():
             raise SystemExit("rename documentation render is not pixel-identical")
         if before_png.read_bytes() == alternate_png.read_bytes():
             raise SystemExit("set-alternate documentation render did not change")
+        if before_png.read_bytes() != converted_png.read_bytes():
+            raise SystemExit("equivalent convert documentation render is not pixel-identical")
 
         shutil.copyfile(before_png, images / "demo-before.png")
         shutil.copyfile(alternate_png, images / "demo-alternate.png")
         shutil.copyfile(removed_png, images / "demo-after.png")
         (images / "demo-rename.svg").write_text(
             _rename_svg(before, after, rename_result),
+            encoding="utf-8",
+        )
+        (images / "demo-convert.svg").write_text(
+            _convert_svg(before, converted_inventory, convert_result),
             encoding="utf-8",
         )
 
@@ -114,28 +138,69 @@ def _render(renderer: str, source: Path, prefix: Path) -> Path:
 
 
 def _rename_svg(before: str, after: str, rename_result: str) -> str:
+    return _mutation_svg(
+        before,
+        after,
+        rename_result,
+        title="Atomic spot-plate rename",
+        metadata_title="spotpdf atomic rename CLI walkthrough",
+        description="The Varnish plate is renamed with a pixel-identical render.",
+        subtitle="The plate name changes. Composite pixels, tints, and vector content do not.",
+        command='$ spotpdf rename demo.pdf --spot Varnish --to "Varnish Renamed" -o renamed.pdf',
+        after_command="$ spotpdf list renamed.pdf",
+        badges=(
+            (72, 228, 91, "#dcfce7", "#166534", "OLD NAME ABSENT"),
+            (318, 230, 337, "#dbeafe", "#1e40af", "NEW NAME PRESENT"),
+            (566, 260, 585, "#f3e8ff", "#6b21a8", "PIXEL-IDENTICAL RENDER"),
+        ),
+    )
+
+
+def _convert_svg(before: str, after: str, convert_result: str) -> str:
+    return _mutation_svg(
+        before,
+        after,
+        convert_result,
+        title="Spot plate to explicit DeviceCMYK",
+        metadata_title="spotpdf explicit DeviceCMYK conversion CLI walkthrough",
+        description="The Varnish plate disappears; its vector paint becomes process CMYK.",
+        subtitle="An equivalent recipe keeps this composite render pixel-identical.",
+        command=("$ spotpdf convert demo.pdf --spot Varnish --to-cmyk 0,62,0,0 -o converted.pdf"),
+        after_command="$ spotpdf list converted.pdf",
+        badges=(
+            (72, 228, 91, "#dcfce7", "#166534", "SPOT PLATE ABSENT"),
+            (318, 230, 337, "#dbeafe", "#1e40af", "CMYK PAINT PRESENT"),
+            (566, 260, 585, "#f3e8ff", "#6b21a8", "PIXEL-IDENTICAL RENDER"),
+        ),
+    )
+
+
+def _mutation_svg(
+    before: str,
+    after: str,
+    mutation_result: str,
+    *,
+    title: str,
+    metadata_title: str,
+    description: str,
+    subtitle: str,
+    command: str,
+    after_command: str,
+    badges: tuple[tuple[int, int, int, str, str, str], ...],
+) -> str:
     before_lines = _terminal_lines(before)
     after_lines = _terminal_lines(after)
-    result = rename_result.strip().split(";", 1)[0]
+    result = mutation_result.strip().split(";", 1)[0]
     left = _svg_lines(before_lines, x=86, y=326)
     right = _svg_lines(after_lines, x=746, y=326)
-    command = '$ spotpdf rename demo.pdf --spot Varnish --to "Varnish Renamed" -o renamed.pdf'
     lines = [
         '<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="820" viewBox="0 0 1440 820">',
-        "  <title>spotpdf atomic rename CLI walkthrough</title>",
-        "  <desc>The Varnish plate is renamed with a pixel-identical render.</desc>",
+        f"  <title>{html.escape(metadata_title)}</title>",
+        f"  <desc>{html.escape(description)}</desc>",
         '  <rect width="1440" height="820" fill="#f5f7fb"/>',
         '  <rect width="1440" height="168" fill="#0e1422"/>',
-        "  " + _svg_text(72, 78, "#ffffff", "sans", 42, "Atomic spot-plate rename", 700),
-        "  "
-        + _svg_text(
-            72,
-            124,
-            "#c8d0df",
-            "sans",
-            24,
-            "The plate name changes. Composite pixels, tints, and vector content do not.",
-        ),
+        "  " + _svg_text(72, 78, "#ffffff", "sans", 42, title, 700),
+        "  " + _svg_text(72, 124, "#c8d0df", "sans", 24, subtitle),
         '  <rect x="70" y="210" width="630" height="438" rx="16" fill="#111827"/>',
         '  <rect x="730" y="210" width="640" height="438" rx="16" fill="#111827"/>',
         "  " + _window_dots(102),
@@ -148,23 +213,13 @@ def _rename_svg(before: str, after: str, rename_result: str) -> str:
             "#93c5fd",
             "mono",
             20,
-            "$ spotpdf list renamed.pdf",
+            after_command,
         ),
         "  " + left,
         "  " + right,
         "  " + _svg_text(72, 700, "#111827", "mono", 20, command),
         "  " + _svg_text(72, 738, "#374151", "mono", 17, result),
-        "  " + _badge(72, 228, 91, "#dcfce7", "#166534", "OLD NAME ABSENT"),
-        "  " + _badge(318, 230, 337, "#dbeafe", "#1e40af", "NEW NAME PRESENT"),
-        "  "
-        + _badge(
-            566,
-            260,
-            585,
-            "#f3e8ff",
-            "#6b21a8",
-            "PIXEL-IDENTICAL RENDER",
-        ),
+        *("  " + _badge(*badge) for badge in badges),
         "</svg>",
     ]
     return "\n".join(lines) + "\n"

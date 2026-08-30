@@ -37,12 +37,12 @@ and qpdf current. See qpdf's
 
 ### 2. spotpdf application budgets
 
-Every input-processing CLI subcommand and each of the six documented path-based
-library operations has configurable ceilings for input bytes, pages, reachable graph entries,
-decoded page/Form content bytes, and content operators. The checks run in a
-deterministic order before mutation. An overrun never publishes or replaces an
-output, and no private temporary candidate remains. Defaults, API names, and
-exact counter semantics are documented in
+Every input-processing CLI subcommand and each of the seven documented
+path-based library operations has configurable ceilings for input bytes, pages,
+reachable graph entries, decoded page/Form content bytes, and content
+operators. The checks run in a deterministic order before mutation. An overrun
+never publishes or replaces an output, and no private temporary candidate
+remains. Defaults, API names, and exact counter semantics are documented in
 [processing budgets](docs/processing-budgets.md).
 
 These are refusal points, not proof that a sub-limit PDF is safe. Native qpdf

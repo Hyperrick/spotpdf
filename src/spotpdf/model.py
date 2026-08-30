@@ -244,3 +244,17 @@ class AlternateResult:
     spot: str
     cmyk_percentages: tuple[float, float, float, float]
     definitions_changed: int
+
+
+@dataclass(frozen=True)
+class ConversionResult:
+    """Summary of one explicit Separation-to-DeviceCMYK conversion."""
+
+    spot: str
+    cmyk_percentages: tuple[float, float, float, float]
+    definitions_removed: int
+    resources_removed: int
+    page_content_sequences_changed: int
+    forms_changed: int
+    color_operators_rewritten: int
+    pages_affected: tuple[int, ...]

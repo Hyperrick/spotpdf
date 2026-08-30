@@ -6,7 +6,7 @@
 CLI
  └─ document orchestration and atomic publication
      ├─ semantic color-space inventory
-     ├─ complete rename and alternate-preview planning
+     ├─ complete rename, alternate-preview, and conversion planning
      ├─ content resource resolution
      ├─ document safety preflight
      └─ stateful content-stream rewrite
@@ -34,12 +34,31 @@ CLI
 - `publication.py` owns strict opening, compatibility-preserving saves,
   temporary output, and atomic/no-clobber publication shared by mutating
   commands.
-- `alternate.py` owns alternate-preview request parsing, mutation orchestration,
-  and in-memory/post-save verification.
+- `alternate.py` owns alternate-preview mutation orchestration and
+  in-memory/post-save verification.
 - `alternate_plan.py` discovers every matching Separation, rejects target-related
   DeviceN/malformed use, and owns exact preview-slot application.
 - `alternate_validation.py` validates existing alternate spaces/tint functions
   and rejects target definitions embedded in inline-image content dictionaries.
+- `cmyk.py` owns exact percentage validation, canonical PDF-number storage, and
+  tint-by-recipe arithmetic shared by preview changes and conversion.
+- `convert.py` owns explicit-DeviceCMYK orchestration, atomic publication, and
+  in-memory/post-save verification; `separation_targets.py` validates one
+  unambiguous exact target and proves inventory coverage.
+- `convert_plan.py` combines precomputed resource and content edits into one
+  complete plan; `convert_resources.py` plans exact target-alias deletions,
+  while `convert_aliases.py` rejects surviving resource-scoped color-space,
+  image, shading, transparency-group, and Tiling Pattern references.
+- `convert_resource_contexts.py` records only resource dictionaries proven to
+  belong to actual Page or Form content contexts, retains every reachable path
+  to each context, and records indirect ancestor containers for owner
+  provenance.
+- `convert_streams.py` traverses page/Form invocation and resource contexts;
+  `convert_content.py` plans stateful operator replacement,
+  `convert_operators.py` owns the ISO operator whitelist and graphics-object
+  context rules, and `convert_state.py` owns independent fill/stroke state.
+  `convert_stream_owners.py` proves that every planned write has only its
+  allowed direct content-owner roles.
 - `mutation_verification.py` owns inventory/content fingerprints and saved
   content-stream parse checks shared by non-removal mutations.
 - `rename.py` owns rename orchestration, location-bound fingerprints, reverse
@@ -58,6 +77,9 @@ CLI
 - `inventory.py` assembles the role-aware Separation/DeviceN/NChannel report.
 - `inventory_graph.py` owns iterative reachable-object traversal and location
   propagation.
+- `trailer_semantics.py` defines the shared semantic trailer boundary used by
+  whole-document fingerprints and conversion owner checks. It excludes only
+  storage bookkeeping (`/ID`, `/Prev`, `/Size`, and `/XRefStm`).
 - `inventory_prepress.py` inventories supported page and annotation prepress
   dependencies.
 - `inventory_values.py` owns small PDF value decoders, path encoding, and
@@ -68,8 +90,8 @@ CLI
   preflight.
 - `content.py` interprets the graphics-state subset needed to remove supported
   path and text paint.
-- `content_support.py` owns graphics state and parsing helpers shared by the
-  read-only inventory and removal rewriter.
+- `content_support.py` owns graphics-state and parsing helpers shared by the
+  read-only inventory, removal rewriter, and conversion planner.
 - `objects.py` owns stable identity and cycle-safe graph traversal support.
 - `model.py` contains shared values, result types, and user-facing exceptions.
 
@@ -85,7 +107,7 @@ input-byte check
   → qpdf syntax check and final warnings
   → declaration inventory
   → mutation preflight
-  → complete rename/alternate plan or removal dry run
+  → complete rename/alternate/conversion plan or removal dry run
   → in-memory rewrite
   → in-memory semantic check
   → save to sibling temporary file
@@ -103,11 +125,12 @@ Removal semantics can depend on inherited graphics state, Form resources, and
 text rendering modes, so removal performs a full dry run. Rename first builds a
 deduplicated plan containing every definition slot and supported exact-name
 reference. `set-alternate` builds a deduplicated one-to-one plan for every target
-Separation and rejects target-related DeviceN use. In every case the plan is
-known to be complete before any in-memory object is changed. Removal currently
-pays for a second stream parse; rename and alternate-preview changes do not
-interpret or rewrite paint operands. They parse page and Form content syntax
-after saving and compare location-bound decoded stream hashes.
+Separation and rejects target-related DeviceN use. Conversion builds exact
+target-resource deletions and stateful page/Form stream replacements. In every
+case the plan is known to be complete before any in-memory object is changed.
+Removal currently pays for a second stream parse; rename and alternate-preview
+changes do not interpret or rewrite paint operands. They parse page and Form
+content syntax after saving and compare location-bound decoded stream hashes.
 
 For dictionary-key references such as `/Colorants`, `/Solidities`, and
 `/DotGain`, planning also checks the destination key before deleting the source
@@ -127,6 +150,32 @@ name, Separation array identity, tint operands, resources, and content streams
 remain untouched. Inventory coverage, the requested function, and full document
 semantics are checked in memory and again after strict reopen.
 
+Conversion verifies every original target alias and decoded stream before
+applying either class of edit. Its normalized whole-document guard masks only
+the planned resource slots and content digests, using location-specific
+replacement markers so swaps or omissions cannot compare equal. After apply,
+the target must be absent, every planned slot must have the exact intended
+state, all content must parse, and the unmasked semantic fingerprint must remain
+stable across save and strict reopen.
+
+Before those fingerprints are masked, conversion proves the owner roles of
+every planned stream. A Page write may have only Page `/Contents` owners; reuse
+as a Form or any non-content payload is rejected because those roles can have
+different effective resources and semantics. A Form write is accepted only
+through a direct `/XObject` slot in resources proven to belong to an actual
+Page/Form context. Any additional external owner, including a catalog
+`/StructTreeRoot /K` MCR `/Stm` association, fails closed. Appearance and
+soft-mask streams remain outside the supported conversion subset.
+Resource-looking keys inside `/PieceInfo` or private data, and matching ancestor
+path fragments, do not establish a content owner.
+
+A page `/Contents` Array is parsed as one logical operator sequence. When that
+sequence changes, conversion keeps the existing Array object, serializes the
+complete replacement into its first stream, and empties the remaining streams.
+This preserves cross-stream operand/operator semantics without replacing the
+page's resource or Contents containers. If any member stream has another
+reachable owner, conversion rejects the input instead of consolidating it.
+
 Decoded streams remain byte-sensitive. The only storage normalization is for a
 valid `/Type /Metadata` plus `/Subtype /XML` stream: the XML root, comments,
 processing instructions, scoped namespace bindings, and meaningful XMP packet
@@ -136,11 +185,12 @@ decoded raw bytes instead.
 
 ## Resource limits
 
-Each of the six documented path-based operations (`inspect_pdf`, `check_spot`,
-`remove_spot`, `remove_all_spots`, `rename_spot`, and `set_alternate_cmyk`)
-receives immutable `ProcessingLimits`; no counters or overrides live in mutable
-CLI/module globals. File size is checked before `pikepdf.open()`. After a
-non-recovering open and rejection of immediate warnings, one fresh source audit
+Each of the seven documented path-based operations (`inspect_pdf`, `check_spot`,
+`remove_spot`, `remove_all_spots`, `rename_spot`, `set_alternate_cmyk`, and
+`convert_spot_to_cmyk`) receives immutable `ProcessingLimits`; no counters or
+overrides live in mutable CLI/module globals. File size is checked before
+`pikepdf.open()`. After a non-recovering open and rejection of immediate
+warnings, one fresh source audit
 checks pages, trailer-reachable graph entries, decoded page/Form content, and
 lexical content operators in that order. Only then does qpdf's complete syntax
 check run and final warnings get rejected. The limits are inclusive and an
@@ -164,7 +214,7 @@ root-context-aware traversal with cycle tracking and cached graph edges.
 Indirect definitions retain their PDF object/generation number; direct
 definitions use a deterministic reachable path as their identity. Operators
 with unresolved color spaces, patterns, XObjects, or shadings are rejected when
-encountered during a removal pass.
+encountered during a removal or conversion pass.
 
 Read-only usage inventory performs one ordered structural-hazard traversal and
 one content interpretation pass. It keeps independent per-colorant state, so an
