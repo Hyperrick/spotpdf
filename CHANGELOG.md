@@ -5,6 +5,8 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-30
+
 ### Added
 
 - Automated repository hygiene checks reject tracked PDFs and broken local
@@ -44,6 +46,8 @@ All notable user-visible changes are documented here. The project follows
   colorant roles/kinds, and controlled errors now have one canonical package-root
   import surface. All path arguments consistently accept strings and path-like
   objects, and built distributions declare and verify PEP 561 inline typing.
+- Stable-release validation now binds both the bug-report and usage-question
+  version placeholders to the package version.
 
 ### Security
 
@@ -274,7 +278,8 @@ First public beta release.
 - Verify saved output before atomic replacement and preserve an existing forced
   destination whenever processing fails.
 
-[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Hyperrick/spotpdf/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Hyperrick/spotpdf/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Hyperrick/spotpdf/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Hyperrick/spotpdf/compare/v0.3.0...v0.4.0

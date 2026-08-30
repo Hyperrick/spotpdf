@@ -2,7 +2,7 @@
   "schema_version": 1,
   "sha256_inputs": {
     "examples/create_demo_pdf.py": "8fec3fd37df826f6913835eca95d2f45f0b435971c62fad7fa744b1fba4ab4ca",
-    "pyproject.toml": "bd823c7270078b14eddf866b501a3f1dbce441c0f2b94ab85cae4b009b35c012",
+    "pyproject.toml": "c07f9c6d9796b4edb5fbd7cd6ee1f2bafbfca6ff5004407a3b0b6607e9b40235",
     "scripts/create_docs_images.py": "6c3304b8e472bf760664d4ee213696113fe63e9593be7bbdfd34ebf8dd452132",
     "scripts/docs_image_check.py": "d95bc1372f98c2f1661073a95adb0b596320d2058defcfe46c3460cb706bdee9",
     "src/spotpdf/__init__.py": "64481aa01738feb804170c35daba2fbcf33141421bda8d585fa0e4d4d9a3325f",
@@ -58,6 +58,6 @@
     "src/spotpdf/scan.py": "6ebed4e3c5f954787bae7ec78ef5e5ee8a60a8e2075e6bfde5e224b4b75d7280",
     "src/spotpdf/separation_targets.py": "ae7e21184ec367c823744864d32583aaebe6cbb0b6b9ac189d39e0d193f6101d",
     "src/spotpdf/trailer_semantics.py": "be0b6f09645ea4894fb158ce720823e6a785df43c3b87273290aa19093a7bd6e",
-    "uv.lock": "4de04c7cb364a81875e001864af6d235460cac54d0fb4623e6465af119f71025"
+    "uv.lock": "871eda275dbbd6596098d3d254a0023d25619e4056b0ff6a65d30cf8d1d4b1b3"
   }
 }

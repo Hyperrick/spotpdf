@@ -77,12 +77,13 @@ class ReleaseMetadataTests(unittest.TestCase):
             "# Security\n\nPublished security contract.\n",
             encoding="utf-8",
         )
-        template = self.root / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
-        template.parent.mkdir(parents=True, exist_ok=True)
-        template.write_text(
-            f'placeholder: "spotpdf {project_version}"\n',
-            encoding="utf-8",
-        )
+        templates = self.root / ".github" / "ISSUE_TEMPLATE"
+        templates.mkdir(parents=True, exist_ok=True)
+        for name in ("bug_report.yml", "question.yml"):
+            (templates / name).write_text(
+                f'placeholder: "spotpdf {project_version}"\n',
+                encoding="utf-8",
+            )
 
     def test_valid_metadata_returns_version(self) -> None:
         self.assertEqual(validate_release_metadata(self.root, "v0.3.0"), "0.3.0")
@@ -255,11 +256,21 @@ class ReleaseMetadataTests(unittest.TestCase):
                 )
                 self.assertEqual(validate_release_metadata(self.root, "v0.3.0"), "0.3.0")
 
-    def test_bug_report_placeholder_must_match_release(self) -> None:
-        template = self.root / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
-        template.write_text('placeholder: "spotpdf 0.2.1"\n', encoding="utf-8")
-        with self.assertRaisesRegex(ReleaseCheckError, "bug-report version placeholder"):
-            validate_release_metadata(self.root, "v0.3.0")
+    def test_issue_template_placeholders_must_match_release(self) -> None:
+        templates = (
+            ("bug_report.yml", "bug-report"),
+            ("question.yml", "question"),
+        )
+        for name, label in templates:
+            with self.subTest(template=name):
+                self._write_metadata()
+                template = self.root / ".github" / "ISSUE_TEMPLATE" / name
+                template.write_text('placeholder: "spotpdf 0.2.1"\n', encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ReleaseCheckError,
+                    f"{label} version placeholder",
+                ):
+                    validate_release_metadata(self.root, "v0.3.0")
 
     def test_release_documents_reject_development_only_claims(self) -> None:
         claims = (
