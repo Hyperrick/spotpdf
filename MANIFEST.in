@@ -3,6 +3,7 @@ include CONTRIBUTING.md
 include LICENSE
 include README.md
 include SECURITY.md
+include SUPPORT.md
 include docs/architecture.md
 include docs/compatibility.md
 include docs/json-output.md

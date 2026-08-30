@@ -447,4 +447,5 @@ the same fail-closed and post-save verification guarantees.
 - [Public corpus and RIP checks](docs/public-corpus.md)
 - [Release process and artifact verification](docs/releasing.md)
 - [Security policy](SECURITY.md)
+- [Support and issue routing](SUPPORT.md)
 - [MIT License](LICENSE)
