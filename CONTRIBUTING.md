@@ -32,6 +32,7 @@ Before submitting a pull request, run:
 uv run ruff check .
 uv run ruff format --check .
 uv run python -m unittest discover -s tests -v
+uv run python scripts/benchmark_inventory.py --runs 3
 uv build --no-build-isolation
 uv run python scripts/check_distribution.py dist
 ```
@@ -44,6 +45,10 @@ uv run python scripts/check_public_corpus.py
 
 See [docs/public-corpus.md](docs/public-corpus.md) for system dependencies,
 attribution, licenses, and offline reproduction.
+
+The inventory benchmark creates 64- and 128-spot PDFs only in a temporary
+directory. Its page/Form parse counts are deterministic; timing and Python heap
+measurements are diagnostic. See [docs/performance.md](docs/performance.md).
 
 ## PDF fixtures
 

@@ -10,29 +10,28 @@ from typing import Any
 import pikepdf
 
 from .colors import (
-    SPECIAL_COLORANTS,
     all_mode_targets,
     remove_spot_resource_aliases_for_spots,
     resource_aliases_for_spots,
     walk_pdf_object,
 )
-from .content import ContentRewriter, GraphicsState
+from .content import ContentRewriter
+from .content_support import GraphicsState, operator_name
+from .inspection import enrich_inspection_report
 from .inventory import discover_spot_declarations
 from .model import (
     BatchRemovalResult,
-    ColorantRole,
     InspectionReport,
     InvalidPdfError,
     RemovalStats,
     SpotPdfError,
     UnsupportedSpotUseError,
 )
-from .objects import ObjectTracker, object_key
+from .objects import ObjectTracker, anchored_object_key, object_key
 from .publication import atomic_pdf_output, open_strict, save_pdf
 from .scan import (
     MAX_FORM_NESTING,
     validate_document_for_changes,
-    validate_spot_uses_for_removal,
 )
 
 
@@ -42,8 +41,16 @@ class _ProcessingContext:
     targets: frozenset[str]
     apply: bool
     stats: RemovalStats
-    processed_forms: dict[tuple[Any, ...], tuple[Any, ...]] = field(default_factory=dict)
+    processed_forms: dict[tuple[Any, ...], _ProcessedForm] = field(default_factory=dict)
     processing_forms: set[tuple[Any, ...]] = field(default_factory=set)
+    page_touched_by_form: bool = False
+    form_change_generation: int = 0
+
+
+@dataclass(frozen=True)
+class _ProcessedForm:
+    signature: tuple[Any, ...]
+    changed: bool
 
 
 def inspect_pdf(path: Path) -> InspectionReport:
@@ -51,30 +58,7 @@ def inspect_pdf(path: Path) -> InspectionReport:
 
     with open_strict(path) as pdf:
         report = discover_spot_declarations(pdf)
-        for name, summary in report.colorants.items():
-            if name in SPECIAL_COLORANTS:
-                summary.contexts.add("reserved separation")
-                continue
-            if ColorantRole.PROCESS in summary.roles:
-                summary.contexts.add("process colorant; preserved by --all")
-            stats = RemovalStats()
-            try:
-                validate_spot_uses_for_removal(
-                    pdf,
-                    frozenset({name}),
-                    declarations=report,
-                )
-                _process_document(pdf, frozenset({name}), apply=False, stats=stats)
-            except UnsupportedSpotUseError as error:
-                summary.contexts.add(f"unsupported: {error}")
-            summary.pages.update(stats.pages_changed)
-            summary.paint_operations = (
-                stats.text_show_operations + stats.fills_removed + stats.strokes_removed
-            )
-            if summary.paint_operations:
-                summary.contexts.add("painted")
-            else:
-                summary.contexts.add("declared")
+        enrich_inspection_report(pdf, report)
         return report
 
 
@@ -177,7 +161,12 @@ def _process_document(
 ) -> None:
     context = _ProcessingContext(pdf=pdf, targets=targets, apply=apply, stats=stats)
     for page_number, page in enumerate(pdf.pages, start=1):
+        context.page_touched_by_form = False
         resources = page.Resources
+        resource_identity = anchored_object_key(
+            resources,
+            ("page", page_number, "Resources"),
+        )
         instructions = pikepdf.parse_content_stream(page)
         if _contains_inline_image(instructions) and resource_aliases_for_spots(resources, targets):
             raise UnsupportedSpotUseError(
@@ -188,12 +177,17 @@ def _process_document(
             context,
             instructions,
             resources,
+            resource_identity,
             GraphicsState(),
             f"page {page_number}",
         )
-        if result.changed or _change_counter(stats) != changes_before:
+        if (
+            result.changed
+            or context.page_touched_by_form
+            or _change_counter(stats) != changes_before
+        ):
             stats.pages_changed.add(page_number)
-            if apply:
+            if apply and result.changed:
                 if _contains_inline_image(instructions):
                     raise UnsupportedSpotUseError(
                         f"page {page_number}: rewriting a stream with inline images "
@@ -213,6 +207,7 @@ def _process_stream(
     context: _ProcessingContext,
     instructions: list[Any],
     resources: Any,
+    resource_identity: tuple[Any, ...],
     initial_state: GraphicsState,
     label: str,
     form_depth: int = 0,
@@ -222,6 +217,7 @@ def _process_stream(
             context,
             form,
             resources,
+            resource_identity,
             inherited_state,
             label,
             form_depth + 1,
@@ -241,6 +237,7 @@ def _process_form(
     context: _ProcessingContext,
     form: Any,
     parent_resources: Any,
+    parent_resource_identity: tuple[Any, ...],
     inherited_state: GraphicsState,
     parent_label: str,
     form_depth: int,
@@ -250,8 +247,15 @@ def _process_form(
             f"{parent_label}: Form nesting exceeds the supported limit of {MAX_FORM_NESTING}"
         )
     form_key = object_key(form)
-    resources = form.get(pikepdf.Name.Resources, parent_resources)
-    resource_key = object_key(resources)
+    if pikepdf.Name.Resources in form:
+        resources = form.get(pikepdf.Name.Resources, None)
+        resource_key = anchored_object_key(
+            resources,
+            ("form", *form_key, "Resources"),
+        )
+    else:
+        resources = parent_resources
+        resource_key = parent_resource_identity
     signature = (
         resource_key,
         inherited_state.nonstroking.contains_any(context.targets),
@@ -260,41 +264,49 @@ def _process_form(
     )
     previous = context.processed_forms.get(form_key)
     if previous is not None:
-        if previous != signature:
+        if previous.signature != signature:
             raise UnsupportedSpotUseError(
                 f"{parent_label}: a shared Form requires context-dependent rewriting"
             )
+        if previous.changed:
+            context.page_touched_by_form = True
+            context.form_change_generation += 1
         return
     if form_key in context.processing_forms:
         raise UnsupportedSpotUseError(f"{parent_label}: cyclic Form XObjects are not supported")
 
     context.processing_forms.add(form_key)
     try:
+        generation_before = context.form_change_generation
         instructions = pikepdf.parse_content_stream(form)
         label = f"{parent_label} Form {form_key}"
         result = _process_stream(
             context,
             instructions,
             resources,
+            resource_key,
             inherited_state,
             label,
             form_depth,
         )
         if result.changed:
+            if _contains_inline_image(instructions):
+                raise UnsupportedSpotUseError(
+                    f"{label}: rewriting a stream with inline images is not supported"
+                )
             context.stats.forms_changed += 1
+            context.form_change_generation += 1
             if context.apply:
-                if _contains_inline_image(instructions):
-                    raise UnsupportedSpotUseError(
-                        f"{label}: rewriting a stream with inline images is not supported"
-                    )
                 form.write(pikepdf.unparse_content_stream(result.instructions))
-        context.processed_forms[form_key] = signature
+        subtree_changed = result.changed or context.form_change_generation != generation_before
+        context.page_touched_by_form |= subtree_changed
+        context.processed_forms[form_key] = _ProcessedForm(signature, subtree_changed)
     finally:
         context.processing_forms.remove(form_key)
 
 
 def _contains_inline_image(instructions: list[Any]) -> bool:
-    return any(not hasattr(item, "operator") for item in instructions)
+    return any(operator_name(item) == "INLINE IMAGE" for item in instructions)
 
 
 def _change_counter(stats: RemovalStats) -> tuple[int, ...]:

@@ -21,6 +21,8 @@ GitHub assets.
    uv run ruff check .
    uv run ruff format --check .
    uv run python -m unittest discover -s tests -v
+   uv run python scripts/benchmark_inventory.py --runs 9 \
+     --output tmp/inventory-benchmark.json
    uv run python scripts/check_public_corpus.py
    uv build --no-build-isolation --out-dir tmp/release-dist
    uv run python scripts/check_distribution.py tmp/release-dist

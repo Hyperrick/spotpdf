@@ -17,6 +17,14 @@ CLI
 
 - `cli.py` owns arguments, exit codes, and human-readable output.
 - `document.py` owns inspect/check/remove orchestration and two-pass removal.
+- `inspection.py` combines semantic declarations, structural hazards, and
+  content usage into the public read-only report.
+- `inventory_hazards.py` attributes each colorant's first removal-preflight
+  hazard while traversing page resources once.
+- `inventory_content.py` interprets each reached page or compatible Form stream
+  once and accumulates per-colorant pages, paint operations, and unsupported
+  contexts.
+- `inventory_usage.py` contains private usage and deterministic work counters.
 - `publication.py` owns strict opening, compatibility-preserving saves,
   temporary output, and atomic/no-clobber publication shared by mutating
   commands.
@@ -54,6 +62,8 @@ CLI
   preflight.
 - `content.py` interprets the graphics-state subset needed to remove supported
   path and text paint.
+- `content_support.py` owns graphics state and parsing helpers shared by the
+  read-only inventory and removal rewriter.
 - `objects.py` owns stable identity and cycle-safe graph traversal support.
 - `model.py` contains shared values, result types, and user-facing exceptions.
 
@@ -122,6 +132,22 @@ as their identity. Form invocation and resource nesting are limited to 64 levels
 and fail with a normal user-facing error beyond that boundary. Operators with
 unresolved color spaces, patterns, XObjects, or shadings are rejected when
 encountered during a removal pass.
+
+Read-only usage inventory performs one ordered structural-hazard traversal and
+one content interpretation pass. It keeps independent per-colorant state, so an
+unsupported use freezes only that colorant while unrelated colors continue to
+be counted. A compatible shared Form is parsed and counted once, but its cached
+effect is attributed to every calling page. Stable owner-anchored identities are
+used for direct Form resource dictionaries rather than transient Python wrapper
+IDs. The deterministic 64/128-spot contract and representative measurements are
+documented in [performance.md](performance.md).
+
+The semantic graph omits only redundant `/Parent` back-links on objects whose
+`/Type` is `/Page` or `/Pages`; identically named edges in private and other PDF
+structures remain reachable. Resource-hazard subtree results are cached by
+stable PDF object identity. Regression fixtures grow pages/Forms and shared
+resource aliases from 64 to 128 objects to guard both paths against quadratic
+cross-expansion.
 
 The tool does not impose whole-process CPU or memory quotas. Use an external
 sandbox for hostile PDFs as described in [SECURITY.md](../SECURITY.md).

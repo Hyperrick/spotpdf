@@ -128,6 +128,12 @@ spotpdf check input.pdf --spot "Varnish"
 `check --spot` answers only for spot/removal candidates, so a process-only
 NChannel component shown by `list` is reported as absent by `check`.
 
+Inventory work is single-pass: removal hazards are attributed in one resource
+scan and every reached page or compatible Form stream is interpreted once, not
+once per declared colorant. Shared Form paint is counted once while every
+compatible calling page is reported. See the reproducible
+[64/128-spot benchmark](docs/performance.md).
+
 Rename one spot plate without changing its preview color or paint values:
 
 ```bash
@@ -221,7 +227,7 @@ exit code `2` explicitly.
 | TrapNet `/SeparationColorNames` | Exact dependency inventory | No; target occurrence fails closed | Names unchanged | No |
 | Type 5 halftones, OPI, PrinterMark `/AP /R` or `/AP /D` | No dedicated hazard scan | No; target occurrence fails closed | Definitions only | No |
 | Images, patterns, and shadings | Inventory only | Definitions only | Reachable definitions only | No |
-| Inline images | No definition inventory | Definitions only | Resource aliases work; embedded target definitions fail closed | No |
+| Inline images | Resource declarations plus unsupported status | Definitions only | Resource aliases work; embedded target definitions fail closed | No |
 | Type 3 fonts and soft masks | Inventory only | Definitions only | Reachable definitions only | No |
 | Signed PDFs | Read-only inspection | No; rewriting invalidates signatures | No; rewriting invalidates signatures | No; rewriting invalidates signatures |
 | Encrypted or modification-restricted PDFs | Limited by parser | No | No | No |
