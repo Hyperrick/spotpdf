@@ -53,6 +53,32 @@ jobs:
           retention-days: 14
           compression-level: 0
 
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync locked development environment
+        run: uv sync --locked --dev
+      - name: Install documentation render tools
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install --yes --no-install-recommends poppler-utils
+      - name: Check tracked files and documentation targets
+        run: uv run python scripts/check_repository.py
+      - name: Verify synthetic documentation images
+        run: uv run python scripts/create_docs_images.py --check
+
   test:
     name: Test / ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
@@ -122,7 +148,7 @@ jobs:
 
   package:
     name: Package
-    needs: [quality, test, public_corpus]
+    needs: [quality, documentation, test, public_corpus]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -134,12 +160,13 @@ jobs:
       - name: Require successful prerequisite jobs
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
+          DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
           TEST_RESULT: ${{ needs.test.result }}
           PUBLIC_CORPUS_RESULT: ${{ needs.public_corpus.result }}
           IS_RELEASE_TAG: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
         run: |
-          if [[ "$QUALITY_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
-            echo "Quality and test jobs must pass before packaging." >&2
+          if [[ "$QUALITY_RESULT" != "success" || "$DOCUMENTATION_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
+            echo "Quality, documentation, and test jobs must pass before packaging." >&2
             exit 1
           fi
           expected_corpus_result="skipped"

@@ -5,6 +5,16 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Automated repository hygiene checks reject tracked PDFs and broken local
+  documentation file targets, while CI regenerates every synthetic documentation
+  image, verifies an exact source-fingerprint manifest and SVG output, and uses
+  bounded PNG drift checks before packaging.
+- CodeQL analysis for Python runs on pull requests, `main`, a weekly schedule,
+  and manual dispatch with read-only contents plus the required code-scanning
+  write permission.
+
 ## [0.6.0] - 2026-08-30
 
 ### Added

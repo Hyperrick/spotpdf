@@ -23,7 +23,9 @@ GitHub assets.
    uv lock --check
    uv run python scripts/check_release.py metadata --tag vX.Y.Z
    uv run python scripts/check_release.py notes --version X.Y.Z
+   uv run python scripts/check_repository.py
    uv run python scripts/create_docs_images.py
+   uv run python scripts/create_docs_images.py --check
    git diff --check
    uv run ruff check .
    uv run ruff format --check .
@@ -62,20 +64,28 @@ and whether the tagged commit is contained in `main`.
 
 For a `v*` tag, `.github/workflows/ci.yml`:
 
-1. runs Quality and the Python 3.11–3.14 Linux/macOS/Windows test matrix;
-2. downloads every public corpus PDF from a commit-pinned HTTPS URL and checks
+1. runs Quality, documentation hygiene, and the Python 3.11–3.14
+   Linux/macOS/Windows test matrix;
+2. rejects tracked PDFs and broken local documentation file targets, regenerates every
+   synthetic documentation image, requires an exact source-fingerprint manifest
+   and exact SVG output, and uses bounded pixel-drift limits for PNGs so renderer
+   antialiasing does not become a false release failure;
+3. downloads every public corpus PDF from a commit-pinned HTTPS URL and checks
    its exact byte count and SHA-256 digest;
-3. validates source and output with qpdf, checks required equal/different
+4. validates source and output with qpdf, checks required equal/different
    composite renders with Poppler, and checks real plate names with Ghostscript
    `tiffsep`;
-4. builds with the exactly locked setuptools backend;
-5. inspects and installs both the wheel and source archive;
-6. permits exactly one wheel, one source archive, and `SHA256SUMS`;
-7. attests both distributions with GitHub artifact provenance;
-8. extracts the curated notes from the tagged version's dated Changelog
+5. builds with the exactly locked setuptools backend;
+6. inspects and installs both the wheel and source archive;
+7. permits exactly one wheel, one source archive, and `SHA256SUMS`;
+8. attests both distributions with GitHub artifact provenance;
+9. extracts the curated notes from the tagged version's dated Changelog
    section; and
-9. creates the GitHub Release using a job whose only write permission is
+10. creates the GitHub Release using a job whose only write permission is
    `contents: write`.
+
+The separate CodeQL workflow analyzes Python changes on pull requests and
+`main`, runs weekly against current queries, and supports manual dispatch.
 
 Release-tag runs are never cancelled by the workflow concurrency setting. Each
 download boundary rechecks the exact filenames, regular-file status, and
