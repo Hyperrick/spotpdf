@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -15,6 +15,7 @@ from .inventory_values import name_or_string, path_name
 from .metadata_fingerprint import xml_metadata_fingerprint
 from .model import InvalidPdfError, NameDependencyKind, SpotPdfError
 from .objects import ObjectKey, object_key
+from .trailer_semantics import semantic_trailer_items
 
 
 class SlotMode(StrEnum):
@@ -282,31 +283,34 @@ def object_fingerprint(value: Any) -> tuple[Any, ...]:
 
 def semantic_object_fingerprint(
     value: Any,
+    *,
+    masked_streams: Mapping[ObjectKey, bytes] | None = None,
 ) -> tuple[Any, ...]:
     """Fingerprint object meaning while ignoring storage and object numbering."""
 
-    return _semantic_value(value, {})
+    return _semantic_value(value, {}, masked_streams or {})
 
 
-def semantic_pdf_fingerprint(pdf: pikepdf.Pdf) -> tuple[Any, ...]:
+def semantic_pdf_fingerprint(
+    pdf: pikepdf.Pdf,
+    *,
+    masked_streams: Mapping[ObjectKey, bytes] | None = None,
+) -> tuple[Any, ...]:
     """Fingerprint semantic trailer entries while ignoring rewrite bookkeeping."""
 
-    storage_keys = {
-        pikepdf.Name.ID,
-        pikepdf.Name.Prev,
-        pikepdf.Name.Size,
-        pikepdf.Name.XRefStm,
-    }
     return tuple(
-        (str(key), semantic_object_fingerprint(value))
-        for key, value in sorted(pdf.trailer.items(), key=lambda item: str(item[0]))
-        if key not in storage_keys
+        (
+            str(key),
+            semantic_object_fingerprint(value, masked_streams=masked_streams),
+        )
+        for key, value in semantic_trailer_items(pdf)
     )
 
 
 def _semantic_value(
     value: Any,
     references: dict[ObjectKey, int],
+    masked_streams: Mapping[ObjectKey, bytes],
 ) -> tuple[Any, ...]:
     if isinstance(value, (pikepdf.Array, pikepdf.Dictionary, pikepdf.Stream)):
         key = object_key(value)
@@ -327,21 +331,24 @@ def _semantic_value(
             if xml_fingerprint is not None:
                 stream_mode = "metadata-xml"
                 content_fingerprint = xml_fingerprint
+        if key in masked_streams:
+            content_fingerprint = masked_streams[key]
         entries = _semantic_dictionary_entries(
             value,
             references,
+            masked_streams,
             stream_mode=stream_mode,
         )
         return ("stream", stream_mode, entries, content_fingerprint)
     if isinstance(value, pikepdf.Dictionary):
         return (
             "dictionary",
-            _semantic_dictionary_entries(value, references),
+            _semantic_dictionary_entries(value, references, masked_streams),
         )
     if isinstance(value, pikepdf.Array):
         return (
             "array",
-            tuple(_semantic_value(item, references) for item in value),
+            tuple(_semantic_value(item, references, masked_streams) for item in value),
         )
     try:
         serialized = bytes(value.unparse(resolved=True))
@@ -353,6 +360,7 @@ def _semantic_value(
 def _semantic_dictionary_entries(
     value: pikepdf.Dictionary | pikepdf.Stream,
     references: dict[ObjectKey, int],
+    masked_streams: Mapping[ObjectKey, bytes],
     *,
     stream_mode: str | None = None,
 ) -> tuple[tuple[str, tuple[Any, ...]], ...]:
@@ -368,7 +376,7 @@ def _semantic_dictionary_entries(
         if stream_mode is None or key not in storage_keys
     ]
     entries.sort(key=lambda item: item[0])
-    return tuple((key, _semantic_value(item, references)) for key, item in entries)
+    return tuple((key, _semantic_value(item, references, masked_streams)) for key, item in entries)
 
 
 def _is_xml_metadata(value: pikepdf.Stream) -> bool:

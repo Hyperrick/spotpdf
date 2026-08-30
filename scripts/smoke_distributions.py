@@ -18,7 +18,7 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def smoke_archive(archive: Path) -> None:
-    """Install one archive and run preview, rename, and all-spot mutations."""
+    """Install one archive and run preview, rename, convert, and remove mutations."""
 
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
@@ -33,6 +33,7 @@ def smoke_archive(archive: Path) -> None:
         source = root / "input.pdf"
         alternate = root / "alternate.pdf"
         renamed = root / "renamed.pdf"
+        converted = root / "converted.pdf"
         output = root / "output.pdf"
         generator = Path(__file__).parents[1] / "examples" / "create_demo_pdf.py"
         run([sys.executable, str(generator), str(source)])
@@ -65,6 +66,20 @@ def smoke_archive(archive: Path) -> None:
             ]
         )
         after_rename = run([str(executable), "list", str(renamed)])
+        convert_result = run(
+            [
+                str(executable),
+                "convert",
+                str(source),
+                "--spot",
+                "Varnish",
+                "--to-cmyk",
+                "0,62,0,0",
+                "-o",
+                str(converted),
+            ]
+        )
+        after_convert = run([str(executable), "list", str(converted)])
         run(
             [
                 str(executable),
@@ -90,6 +105,17 @@ def smoke_archive(archive: Path) -> None:
         }
         if "Varnish" in renamed_names or "Varnish Renamed" not in renamed_names:
             raise SystemExit(f"demo spot was not renamed with {archive.name}")
+        converted_names = {
+            line.split("\t", 1)[0]
+            for line in after_convert.stdout.splitlines()
+            if "\t" in line and not line.startswith("NAME\t")
+        }
+        if "Converted 'Varnish' paint to explicit DeviceCMYK 0,62,0,0" not in (
+            convert_result.stdout
+        ):
+            raise SystemExit(f"conversion command failed with {archive.name}")
+        if "Varnish" in converted_names or "CutContour" not in converted_names:
+            raise SystemExit(f"conversion inventory is incorrect with {archive.name}")
         if "No reachable named colorants found." not in after.stdout:
             raise SystemExit(f"named colorants remain after removal with {archive.name}")
         print(f"Smoke test passed: {archive.name}")

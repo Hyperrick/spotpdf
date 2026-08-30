@@ -7,6 +7,13 @@ All notable user-visible changes are documented here. The project follows
 
 ### Added
 
+- `convert` CLI command and `convert_spot_to_cmyk` library API for replacing a
+  strictly supported named Separation with explicit DeviceCMYK vector/text
+  paint from an operator-supplied process recipe.
+- Stateful tint conversion across independent fill/stroke state, balanced
+  graphics-state scopes, text rendering modes, and compatible nested Forms.
+- A synthetic qpdf/Poppler/Ghostscript conversion oracle, generated conversion
+  walkthrough, and seventh pinned public-corpus case.
 - Immutable public `ProcessingLimits` configuration and five positive-integer
   CLI overrides for input bytes, pages, reachable graph entries, decoded
   page/Form content bytes, and content operators.
@@ -15,6 +22,27 @@ All notable user-visible changes are documented here. The project follows
 
 ### Safety
 
+- Conversion builds and verifies a complete precomputed resource/stream plan,
+  requires the target plate to be absent after strict reopen, and fingerprints
+  every unplanned document semantic before atomic publication.
+- A resource-scope-aware preflight proves that deleting target aliases cannot
+  leave nested color spaces, images, shadings, transparency groups, or Tiling
+  Pattern content with stale references.
+- Explicit process conversion fails closed for target-related DeviceN,
+  Type 5 halftones, OPI and other prepress dependencies, images and their
+  alternates, patterns, shadings, Type 3 fonts, annotation appearances,
+  transparency, effective overprint, effective `/DefaultCMYK`, ambiguous
+  resource/Form contexts, and malformed or unsupported paint state.
+- Unknown content operators outside PDF `BX`/`EX` compatibility sections are
+  rejected before conversion so vendor extensions cannot hide paint or graphics
+  state changes from the conversion plan. Standard operators are also checked
+  against page/Form versus text-object context, and ExtGState font selections
+  participate in the Type 3 refusal.
+- A stream-owner preflight refuses page/Form cross-role aliases, non-content
+  aliases such as attachments and metadata, and externally referenced
+  `/Contents` Array members. Only direct `/XObject` slots in proven Page/Form
+  resource contexts authorize Form writes; external StructTree MCR `/Stm`
+  associations and private lookalike structures fail closed.
 - Every input-processing subcommand now performs one fixed-order source budget
   preflight before analysis or mutation. Any overrun publishes no output and preserves an
   existing `--force` destination; no created private temporary candidate

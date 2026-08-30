@@ -7,9 +7,11 @@ from typing import Any
 import pikepdf
 
 from .colors import parse_color_space, pdf_name, resolve_color_space
+from .inventory_graph import walk_reachable
 from .inventory_usage import InspectionMetrics
 from .model import InspectionReport, InvalidPdfError, NameDependencyKind, SpotKind
 from .objects import ObjectKey, ObjectTracker, object_key
+from .rename_hazards import target_name_hazards
 from .scan import MAX_FORM_NESTING
 
 
@@ -81,6 +83,7 @@ class _ResourceHazardScanner:
         self.seen_forms = ObjectTracker()
         self._subtree_cache: dict[ObjectKey, frozenset[str]] = {}
         self._color_value_cache: dict[tuple[ObjectKey, ObjectKey], frozenset[str]] = {}
+        self._image_subtree_cache: dict[tuple[ObjectKey, ObjectKey], frozenset[str]] = {}
         self._retained_direct_objects: list[Any] = []
 
     @property
@@ -102,6 +105,28 @@ class _ResourceHazardScanner:
                     return
             resources = page.obj.get(pikepdf.Name.Resources, pikepdf.Dictionary())
             self._scan_resources(resources, f"page {page_number}")
+
+        for visit in walk_reachable(pdf):
+            value = visit.value
+            for hits, message in target_name_hazards(
+                value,
+                frozenset(self.active),
+                operation="spot removal",
+            ):
+                self._reject(hits, f"{min(visit.locations)}: {message}")
+            if not self.active:
+                return
+            if (
+                not isinstance(value, pikepdf.Stream)
+                or value.get(pikepdf.Name.Subtype, None) != pikepdf.Name.Form
+                or not self.seen_forms.visit(value)
+                or pikepdf.Name.Resources not in value
+            ):
+                continue
+            self._scan_resources(
+                value.get(pikepdf.Name.Resources, None),
+                f"uninvoked Form at {min(visit.locations)}",
+            )
 
     def _scan_resources(
         self,
@@ -144,7 +169,14 @@ class _ResourceHazardScanner:
             if not isinstance(entries, pikepdf.Dictionary):
                 continue
             for name, value in entries.items():
-                hits = self._subtree_colorants(value) & self.active
+                hits = self._subtree_colorants(value)
+                if (
+                    category == pikepdf.Name.Shading
+                    and isinstance(value, (pikepdf.Dictionary, pikepdf.Stream))
+                    and pikepdf.Name.ColorSpace in value
+                ):
+                    hits |= self._color_value_colorants(value[pikepdf.Name.ColorSpace], resources)
+                hits &= self.active
                 self._reject(
                     hits,
                     f"{context}: spot color in {label} {pdf_name(name)!r} is not supported",
@@ -157,7 +189,12 @@ class _ResourceHazardScanner:
             for name, font in fonts.items():
                 subtype = pdf_name(font.get(pikepdf.Name.Subtype, pikepdf.Name("/Unknown")))
                 if subtype == "Type3":
-                    hits = self._subtree_colorants(font) & self.active
+                    hits = self._subtree_colorants(font)
+                    if pikepdf.Name.Resources not in font and isinstance(
+                        color_spaces, pikepdf.Dictionary
+                    ):
+                        hits |= self._subtree_colorants(color_spaces)
+                    hits &= self.active
                     self._reject(
                         hits,
                         f"{context}: spot color in Type3 font {pdf_name(name)!r} is not supported",
@@ -184,15 +221,16 @@ class _ResourceHazardScanner:
         for name, xobject in xobjects.items():
             subtype = pdf_name(xobject.get(pikepdf.Name.Subtype, pikepdf.Name("/Unknown")))
             if subtype == "Image":
-                color_space = xobject.get(pikepdf.Name.ColorSpace, None)
-                if color_space is not None:
-                    hits = self._color_value_colorants(color_space, resources) & self.active
-                    self._reject(
-                        hits,
-                        f"{context}: spot-color image {pdf_name(name)!r} is not supported",
-                    )
-                    if not self.active:
-                        return
+                hits = (
+                    self._subtree_colorants(xobject)
+                    | self._image_subtree_colorants(xobject, resources)
+                ) & self.active
+                self._reject(
+                    hits,
+                    f"{context}: spot-color image {pdf_name(name)!r} is not supported",
+                )
+                if not self.active:
+                    return
                 continue
             if subtype != "Form" or not self.seen_forms.visit(xobject):
                 continue
@@ -233,6 +271,35 @@ class _ResourceHazardScanner:
         self._retain_direct(resources, resource_key)
         result = _color_value_colorants(value, resources)
         self._color_value_cache[key] = result
+        return result
+
+    def _image_subtree_colorants(self, value: Any, resources: Any) -> frozenset[str]:
+        value_key = object_key(value)
+        resource_key = object_key(resources)
+        key = (value_key, resource_key)
+        cached = self._image_subtree_cache.get(key)
+        if cached is not None:
+            return cached
+        self._retain_direct(value, value_key)
+        self._retain_direct(resources, resource_key)
+        tracker = ObjectTracker()
+        names: set[str] = set()
+        stack = [value]
+        while stack:
+            current = stack.pop()
+            if not isinstance(current, (pikepdf.Array, pikepdf.Dictionary, pikepdf.Stream)):
+                continue
+            if not tracker.visit(current):
+                continue
+            if isinstance(current, (pikepdf.Dictionary, pikepdf.Stream)):
+                color_space = current.get(pikepdf.Name.ColorSpace, None)
+                if color_space is not None:
+                    names.update(self._color_value_colorants(color_space, resources))
+                stack.extend(current.values())
+            else:
+                stack.extend(current)
+        result = frozenset(names)
+        self._image_subtree_cache[key] = result
         return result
 
     def _retain_direct(self, value: Any, key: ObjectKey) -> None:

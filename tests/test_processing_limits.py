@@ -20,11 +20,13 @@ from spotpdf.alternate import set_alternate_cmyk
 from spotpdf.budget_graph import audit_reachable_graph
 from spotpdf.budget_preflight import audit_pdf
 from spotpdf.cli import build_parser, main
+from spotpdf.convert import convert_spot_to_cmyk
 from spotpdf.document import check_spot, inspect_pdf, remove_all_spots, remove_spot
 from spotpdf.limits import enforce_limit
 from spotpdf.model import (
     AlternateResult,
     BatchRemovalResult,
+    ConversionResult,
     InspectionReport,
     RemovalStats,
     RenameResult,
@@ -208,6 +210,7 @@ class ProcessingLimitsTests(unittest.TestCase):
                 "DemoSpot",
                 (100, 0, 0, 0),
             ),
+            lambda output: convert_spot_to_cmyk(source, output, "DemoSpot", (100, 0, 0, 0)),
         )
         for index, operation in enumerate(operations):
             with self.subTest(index=index):
@@ -251,14 +254,12 @@ class ProcessingLimitsTests(unittest.TestCase):
     def test_shared_form_content_is_charged_once(self) -> None:
         source = self._make_shared_form_pdf()
         usage = self._usage(source)
-
         self.assertEqual(usage.decoded_content_bytes, 2 * len(b"/Shared Do\n") + len(b"q\nQ\n"))
         self.assertEqual(usage.operators, 4)
 
     def test_alias_edges_are_charged_but_shared_targets_expand_once(self) -> None:
         single = self._make_alias_pdf(aliases=1)
         many = self._make_alias_pdf(aliases=128)
-
         self.assertEqual(
             self._usage(many).reachable_objects - self._usage(single).reachable_objects,
             127,
@@ -320,6 +321,12 @@ class ProcessingLimitsTests(unittest.TestCase):
                     limits=limits,
                 ),
             ),
+            (
+                "convert",
+                lambda output, limits: convert_spot_to_cmyk(
+                    source, output, "DemoSpot", (100, 0, 0, 0), force=True, limits=limits
+                ),
+            ),
         )
         tight_limits = {
             "input": self._only_limit("max_input_bytes", 1),
@@ -355,6 +362,9 @@ class ProcessingLimitsTests(unittest.TestCase):
                 source, output, "DemoSpot", "Renamed", force=True, limits=None
             ),
             lambda: set_alternate_cmyk(  # type: ignore[arg-type]
+                source, output, "DemoSpot", (0, 0, 0, 0), force=True, limits=None
+            ),
+            lambda: convert_spot_to_cmyk(  # type: ignore[arg-type]
                 source, output, "DemoSpot", (0, 0, 0, 0), force=True, limits=None
             ),
         )
@@ -398,6 +408,16 @@ class ProcessingLimitsTests(unittest.TestCase):
                 "--spot",
                 "DemoSpot",
                 "--cmyk",
+                "0,0,0,0",
+                "-o",
+                "output.pdf",
+            ],
+            [
+                "convert",
+                "input.pdf",
+                "--spot",
+                "DemoSpot",
+                "--to-cmyk",
                 "0,0,0,0",
                 "-o",
                 "output.pdf",
@@ -457,7 +477,7 @@ class ProcessingLimitsTests(unittest.TestCase):
         self.assertNotIn("WARNING", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
-    def test_cli_passes_fresh_limits_to_all_six_library_entrypoints(self) -> None:
+    def test_cli_passes_fresh_limits_to_all_seven_library_entrypoints(self) -> None:
         cases = (
             (
                 "spotpdf.cli.inspect_pdf",
@@ -506,6 +526,20 @@ class ProcessingLimitsTests(unittest.TestCase):
                     "output.pdf",
                 ],
                 AlternateResult("DemoSpot", (0, 0, 0, 0), 1),
+            ),
+            (
+                "spotpdf.cli.convert_spot_to_cmyk",
+                [
+                    "convert",
+                    "input.pdf",
+                    "--spot",
+                    "DemoSpot",
+                    "--to-cmyk",
+                    "0,0,0,0",
+                    "-o",
+                    "output.pdf",
+                ],
+                ConversionResult("DemoSpot", (0, 0, 0, 0), 1, 1, 1, 0, 2, (1,)),
             ),
         )
         for target, command, result in cases:

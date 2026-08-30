@@ -84,9 +84,12 @@ jobs:
           enable-cache: true
       - name: Sync locked development environment
         run: uv sync --locked --dev
-      - name: Install Poppler for mandatory rename render comparison
+      - name: Install PDF tools for mandatory render and plate comparisons
         if: runner.os == 'Linux' && matrix.python == '3.13'
-        run: sudo apt-get update && sudo apt-get install --yes poppler-utils
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install --yes --no-install-recommends
+          ghostscript poppler-utils qpdf
       - name: Run tests
         run: uv run python -m unittest discover -s tests -v
 

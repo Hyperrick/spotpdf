@@ -45,6 +45,21 @@ destination_spot = "ReleaseGateRed"
 same_composite = true
 
 [[case]]
+id = "verapdf-separation-cmyk-convert"
+filename = "veraPDF-test-suite-6-2-4-4-t01-pass-b-convert.pdf"
+source = "veraPDF corpus PDF/A-2b 6.2.4.4 t01-pass-b"
+source_commit = "01e40281d48e2f3755006fdf596ca25caaea8634"
+url = "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/01e40281d48e2f3755006fdf596ca25caaea8634/PDF_A-2b/6.2%20Graphics/6.2.4.4%20Separation%20and%20DeviceN%20colour%20spaces/veraPDF%20test%20suite%206-2-4-4-t01-pass-b.pdf"
+sha256 = "6f81feb3b805e24b5de34cb5a7bd2f64ebce9818b23c953865d4590feb13abd0"
+bytes = 492362
+license = "CC-BY-4.0"
+license_url = "https://github.com/veraPDF/veraPDF-corpus/blob/01e40281d48e2f3755006fdf596ca25caaea8634/README.md"
+operation = "convert"
+source_spot = "Custom"
+cmyk_percentages = [0, 0, 100, 0]
+same_composite = true
+
+[[case]]
 id = "verapdf-separation-rgb"
 filename = "veraPDF-test-suite-6-2-4-4-t01-pass-f.pdf"
 source = "veraPDF corpus PDF/A-2b 6.2.4.4 t01-pass-f"

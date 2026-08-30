@@ -5,9 +5,10 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 `spotpdf` is a small, fail-closed command-line tool for finding PDF spot colors,
-renaming spot plates, changing their composite CMYK preview, and removing
-supported vector or text paint that uses a named `/Separation` color. Pages stay
-vector-based; the tool does not rasterize them.
+renaming spot plates, changing their composite CMYK preview, converting a
+strictly supported named `/Separation` to explicit DeviceCMYK paint, and
+removing supported vector or text spot paint. Pages stay vector-based; the tool
+does not rasterize them.
 
 > [!IMPORTANT]
 > This is a focused beta, not a general PDF preflight engine. Unsupported spot
@@ -33,6 +34,16 @@ production files are included in this repository.
     </tr>
   </tbody>
 </table>
+
+### Convert one spot plate to explicit process paint
+
+`convert` removes one supported spot plate and replaces every one of its tints
+with explicit DeviceCMYK vector or text paint. The recipe is supplied by the
+operator; it is never inferred from the old alternate preview. This synthetic
+demo deliberately supplies the equivalent `0,62,0,0` recipe, so the composite
+render remains pixel-identical while the `Varnish` plate disappears.
+
+<a href="docs/images/demo-convert.svg"><img src="docs/images/demo-convert.svg" alt="Terminal walkthrough showing the Varnish spot plate converted to explicit DeviceCMYK while unrelated spots remain and the equivalent composite render stays pixel-identical"></a>
 
 ### Rename without changing the artwork
 
@@ -81,7 +92,9 @@ pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.4.0
 ```
 
 Stable v0.4.0 contains `list`, `check`, `remove`, `rename`, and
-`set-alternate`, including the single-pass inventory used by `list`.
+`set-alternate`, including the single-pass inventory used by `list`. The
+current development branch additionally contains the fail-closed `convert`
+command and library API documented below.
 
 For development, clone the repository and use the locked environment:
 
@@ -173,6 +186,43 @@ instead of guessing at multi-ink semantics. Values are stored with PDF number
 precision, so values extremely close to an endpoint can round to 0 or 100.
 The success message reports the values actually stored.
 
+Convert one supported spot plate to an explicit process recipe:
+
+```bash
+spotpdf convert input.pdf --spot "Varnish" \
+  --to-cmyk 0,80,100,0 -o output.pdf
+```
+
+For each selected Separation tint `t`, `convert` writes explicit DeviceCMYK
+`t × (C,M,Y,K)`. Selecting the color space without a following tint is treated
+as tint `1`, as required by the PDF color-state model. The command preserves
+geometry, clipping, and supported text positioning, removes only the target's
+now-unused resource aliases and Separation definitions, and leaves unrelated
+spots intact. It never derives the requested recipe from the existing
+alternate color or performs ICC color conversion. DeviceN, target-bearing
+images, patterns, shadings, Type 3 fonts, transparency, effective overprint,
+annotation appearances, and context-dependent Forms fail closed. Conversion
+also refuses a planned stream that doubles as both page and Form content or as
+non-content data such as an attachment or metadata. A changed `/Contents`
+Array is consolidated only when none of its member streams has another owner.
+See [PDF compatibility](docs/compatibility.md) for the exact initial subset.
+
+The same operation is available as a library API:
+
+```python
+from pathlib import Path
+
+from spotpdf.convert import convert_spot_to_cmyk
+
+result = convert_spot_to_cmyk(
+    Path("input.pdf"),
+    Path("output.pdf"),
+    "Varnish",
+    (0, 80, 100, 0),
+)
+print(result.page_content_sequences_changed, result.pages_affected)
+```
+
 Remove supported paint for one name:
 
 ```bash
@@ -200,7 +250,8 @@ spotpdf remove input.pdf --all -o output.pdf --force
 Even with `--force`, the old output is replaced only after the new PDF has been
 written to a temporary file, reopened, parsed, and checked for remaining target
 spots, stale rename references, or an incorrect alternate definition. The same
-atomic publication guarantee applies to `rename` and `set-alternate`.
+atomic publication guarantee applies to `rename`, `set-alternate`, and
+`convert`.
 
 ## Processing budgets
 
@@ -246,24 +297,24 @@ exit code `2` explicitly.
 
 ## Supported scope
 
-| PDF construct | `list` / `check` | `rename` | `set-alternate` | `remove` |
-| --- | :---: | :---: | :---: | :---: |
-| Named `/Separation` declarations | Yes | Yes | Yes, preview slots only | Yes, for the supported paint below |
-| Vector fills, strokes, and combined path paint | Yes | Unchanged | Unchanged | Yes |
-| Text fill and stroke paint | Yes | Unchanged | Unchanged | Yes, when positioning remains safe |
-| Nested Form XObjects | Yes | Definitions only | Definitions only | Yes, with context and nesting safeguards |
-| `/DeviceN` and NChannel declarations | Role-aware | Consistent spot components alongside a true Separation | No; target occurrence fails closed | No; selected spot components fail closed |
-| `/Colorants` and `/MixingHints` dependencies | Yes | Yes, when structurally consistent | Names unchanged | No; selected dependencies fail closed |
-| Page `/SeparationInfo` | Yes | Yes, when structurally consistent | Names unchanged | No; selected pre-separated colorants fail closed |
-| PrinterMark normal appearances (`/AP /N`) | Yes | Yes, when structurally consistent | Definitions only | No |
-| TrapNet `/SeparationColorNames` | Exact dependency inventory | No; target occurrence fails closed | Names unchanged | No |
-| Type 5 halftones, OPI, PrinterMark `/AP /R` or `/AP /D` | No dedicated hazard scan | No; target occurrence fails closed | Definitions only | No |
-| Images, patterns, and shadings | Inventory only | Definitions only | Reachable definitions only | No |
-| Inline images | Resource declarations plus unsupported status | Definitions only | Resource aliases work; embedded target definitions fail closed | No |
-| Type 3 fonts and soft masks | Inventory only | Definitions only | Reachable definitions only | No |
-| Signed PDFs | Read-only inspection | No; rewriting invalidates signatures | No; rewriting invalidates signatures | No; rewriting invalidates signatures |
-| Encrypted or modification-restricted PDFs | Limited by parser | No | No | No |
-| Parser-detectable syntax errors or warnings | Limited by parser | No | No | No |
+| PDF construct | `list` / `check` | `rename` | `set-alternate` | `convert` | `remove` |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| Named `/Separation` declarations | Yes | Yes | Yes, preview slots only | Yes, exact target only | Yes, for the supported paint below |
+| Vector fills, strokes, and combined path paint | Yes | Unchanged | Unchanged | Yes, explicit `k`/`K` color state | Yes |
+| Text fill and stroke paint | Yes | Unchanged | Unchanged | Yes, supported opaque non-Type3 paint | Yes, when positioning remains safe |
+| Nested Form XObjects | Yes | Definitions only | Definitions only | Yes, with consistent caller context | Yes, with context and nesting safeguards |
+| `/DeviceN` and NChannel declarations | Role-aware | Consistent spot components alongside a true Separation | No; target occurrence fails closed | No; target occurrence fails closed | No; selected spot components fail closed |
+| `/Colorants` and `/MixingHints` dependencies | Yes | Yes, when structurally consistent | Names unchanged | No; target dependency fails closed | No; selected dependencies fail closed |
+| Page `/SeparationInfo` | Yes | Yes, when structurally consistent | Names unchanged | No; target occurrence fails closed | No; selected pre-separated colorants fail closed |
+| PrinterMark normal appearances (`/AP /N`) | Yes | Yes, when structurally consistent | Definitions only | No; target occurrence fails closed | No |
+| TrapNet `/SeparationColorNames` | Exact dependency inventory | No; target occurrence fails closed | Names unchanged | No; target occurrence fails closed | No |
+| Type 5 halftones, OPI, PrinterMark `/AP /R` or `/AP /D` | Target-aware hazard status | No; target occurrence fails closed | Definitions only | No; target occurrence fails closed | No; target occurrence fails closed |
+| Images, patterns, and shadings | Inventory only | Definitions only | Reachable definitions only | No | No |
+| Inline images | Resource declarations plus unsupported status | Definitions only | Resource aliases work; embedded target definitions fail closed | Target-colored: no; unrelated only in unchanged streams | No |
+| Type 3 fonts and soft masks | Inventory only | Definitions only | Reachable definitions only | No | No |
+| Signed PDFs | Read-only inspection | No; rewriting invalidates signatures | No; rewriting invalidates signatures | No; rewriting invalidates signatures | No; rewriting invalidates signatures |
+| Encrypted or modification-restricted PDFs | Limited by parser | No | No | No | No |
+| Parser-detectable syntax errors or warnings | Limited by parser | No | No | No | No |
 
 Removal also stops for clipping text, mixed text that would require font
 metrics, shared Forms that need conflicting caller state, unresolved resources,
@@ -271,21 +322,21 @@ cyclic Forms, and Form nesting beyond the documented safety limit. See the
 [compatibility notes](docs/compatibility.md) for exact behavior.
 
 If a requested removal spot is absent, the input is copied byte-for-byte to the
-new output path. A missing `rename` or `set-alternate` source is an error and
-publishes no output. The tool never edits an input file in place.
+new output path. A missing `rename`, `set-alternate`, or `convert` source is an
+error and publishes no output. The tool never edits an input file in place.
 
 ## Reproduce the demo
 
-Regenerate all four documentation images from the current CLI and a fresh
+Regenerate all five documentation images from the current CLI and a fresh
 synthetic PDF:
 
 ```bash
 uv run python scripts/create_docs_images.py
 ```
 
-The script verifies that the rename render is pixel-identical and that the
-alternate preview render changes before replacing the checked-in images. To
-inspect the mutation steps manually:
+The script verifies that the rename and equivalent-conversion renders are
+pixel-identical and that the alternate preview render changes before replacing
+the checked-in images. To inspect the mutation steps manually:
 
 ```bash
 mkdir -p tmp/pdfs/demo
@@ -293,6 +344,8 @@ uv run python examples/create_demo_pdf.py tmp/pdfs/demo/input.pdf
 uv run spotpdf list tmp/pdfs/demo/input.pdf
 uv run spotpdf set-alternate tmp/pdfs/demo/input.pdf --spot Varnish \
   --cmyk 100,0,0,0 -o tmp/pdfs/demo/alternate.pdf
+uv run spotpdf convert tmp/pdfs/demo/input.pdf --spot Varnish \
+  --to-cmyk 0,62,0,0 -o tmp/pdfs/demo/converted.pdf
 uv run spotpdf remove tmp/pdfs/demo/input.pdf --all \
   -o tmp/pdfs/demo/output.pdf
 uv run spotpdf list tmp/pdfs/demo/output.pdf
@@ -318,8 +371,8 @@ pdftoppm -png -r 144 -singlefile \
 2. Enforce page, graph, decoded-content, and operator budgets; then run qpdf's
    full syntax check and reject final warnings.
 3. Inventory reachable color declarations and exact-name dependencies.
-4. Build a complete rename/alternate plan or perform a complete removal dry run
-   before changing the in-memory document.
+4. Build a complete rename, alternate-preview, or conversion plan, or perform a
+   complete removal dry run before changing the in-memory document.
 5. Apply only the planned slots or selected paint changes as one operation.
 6. Save beside the destination, reopen strictly, and verify the result.
 7. Atomically replace the destination only after every check succeeds.
@@ -333,11 +386,15 @@ they do not make the process a sandbox.
 
 ```bash
 uv sync --locked --dev
+uv lock --check
 uv run ruff check .
 uv run ruff format --check .
+uv run python scripts/check_python_size.py
 uv run python -m unittest discover -s tests -v
-uv build --no-build-isolation
-uv run python scripts/check_distribution.py dist
+artifact_dir="$(mktemp -d)"
+uv build --no-build-isolation --out-dir "$artifact_dir"
+uv run python scripts/check_distribution.py "$artifact_dir"
+uv run python scripts/smoke_distributions.py "$artifact_dir"
 ```
 
 All PDF test fixtures are generated at runtime. Do not add confidential,
@@ -348,13 +405,11 @@ Ghostscript `tiffsep`.
 
 ## Roadmap
 
-The public beta intentionally keeps plate aliasing, preview changes, and
-process conversion as separate operations. The next planned capability is:
-
-- converting a strictly supported Separation subset to explicit DeviceCMYK.
-
-Changing an alternate color and converting to process CMYK have different print
-semantics from `rename` and will not be hidden behind one ambiguous command.
+The public beta intentionally keeps plate aliasing, preview changes, explicit
+process conversion, and paint removal as separate operations. Future work will
+expand only those PDF constructs that can retain the same fail-closed and
+post-save verification guarantees; see the open GitHub issues for the current
+priorities.
 
 ## Project policy
 

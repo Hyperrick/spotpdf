@@ -21,43 +21,75 @@ def inspect_hazards(
 ) -> None:
     """Reject target-related structures whose rename semantics are unsupported."""
 
+    inspect_target_hazards(
+        value,
+        locations,
+        frozenset({source, destination}),
+        operation="atomic spot renames",
+    )
+
+
+def inspect_target_hazards(
+    value: Any,
+    locations: tuple[str, ...],
+    names: frozenset[str],
+    *,
+    operation: str,
+) -> None:
+    """Reject the first unsupported prepress structure mentioning a target."""
+
     if not isinstance(value, (pikepdf.Dictionary, pikepdf.Stream)):
         return
     location = min(locations)
-    names = frozenset({source, destination})
+    hazards = target_name_hazards(value, names, operation=operation)
+    if hazards:
+        _, message = hazards[0]
+        raise UnsupportedSpotUseError(f"{location}: {message}")
+
+
+def target_name_hazards(
+    value: Any,
+    names: frozenset[str],
+    *,
+    operation: str,
+) -> tuple[tuple[frozenset[str], str], ...]:
+    """Return unsupported prepress name occurrences and their refusal messages."""
+
+    if not names or not isinstance(value, (pikepdf.Dictionary, pikepdf.Stream)):
+        return ()
+    hazards: list[tuple[frozenset[str], str]] = []
     opi = value.get(pikepdf.Name.OPI, None)
-    if opi is not None and subtree_mentions(opi, names):
-        raise UnsupportedSpotUseError(
-            f"{location}: OPI colorant references are not supported for atomic spot renames"
-        )
-    source_name = make_pdf_name(source)
-    destination_name = make_pdf_name(destination)
-    if value.get(pikepdf.Name.HalftoneType, None) == 5 and (
-        source_name in value or destination_name in value
-    ):
-        raise UnsupportedSpotUseError(
-            f"{location}: Type 5 halftone colorant names are not supported"
-        )
-    if value.get(pikepdf.Name.Subtype, None) == pikepdf.Name.Image and inks_value_has_any(
-        value.get(pikepdf.Name.Inks, None), names
-    ):
-        raise UnsupportedSpotUseError(
-            f"{location}: external image /Inks colorants are not supported"
-        )
+    if opi is not None:
+        hits = _subtree_hits(opi, names)
+        if hits:
+            hazards.append((hits, f"OPI colorant references are not supported for {operation}"))
+    if value.get(pikepdf.Name.HalftoneType, None) == 5:
+        hits = frozenset(name for name in names if make_pdf_name(name) in value)
+        if hits:
+            hazards.append((hits, "Type 5 halftone colorant names are not supported"))
+    if value.get(pikepdf.Name.Subtype, None) == pikepdf.Name.Image:
+        inks = value.get(pikepdf.Name.Inks, None)
+        hits = frozenset(name for name in names if inks_value_has_any(inks, frozenset({name})))
+        if hits:
+            hazards.append((hits, "external image /Inks colorants are not supported"))
 
     if value.get(pikepdf.Name.Subtype, None) != pikepdf.Name.PrinterMark:
-        return
+        return tuple(hazards)
     appearances = value.get(pikepdf.Name.AP, None)
     if not isinstance(appearances, pikepdf.Dictionary):
-        return
+        return tuple(hazards)
     for key, label in ((pikepdf.Name.R, "AP/R"), (pikepdf.Name.D, "AP/D")):
         unsupported = appearances.get(key, None)
         if unsupported is None:
             continue
-        if subtree_mentions(unsupported, names):
-            raise UnsupportedSpotUseError(
-                f"{location}: {label} appearances involving the target are not supported"
-            )
+        hits = _subtree_hits(unsupported, names)
+        if hits:
+            hazards.append((hits, f"{label} appearances involving the target are not supported"))
+    return tuple(hazards)
+
+
+def _subtree_hits(value: Any, names: frozenset[str]) -> frozenset[str]:
+    return frozenset(name for name in names if subtree_mentions(value, frozenset({name})))
 
 
 def subtree_mentions(value: Any, names: frozenset[str]) -> bool:
@@ -218,10 +250,12 @@ def name_field_mentions(value: Any, names: frozenset[str]) -> bool:
 __all__ = [
     "devicen_target_mentions",
     "inspect_hazards",
+    "inspect_target_hazards",
     "is_matching_separation",
     "mixing_hints_contain",
     "name_field_mentions",
     "name_array_contains",
     "normal_appearance_forms",
     "subtree_mentions",
+    "target_name_hazards",
 ]

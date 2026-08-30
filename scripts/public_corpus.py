@@ -168,9 +168,11 @@ def _parse_case(raw: Any) -> CorpusCase:
     if operation == "rename" and (source_spot is None or destination_spot is None):
         raise ValueError(f"rename corpus case {values['id']} requires both spot names")
     cmyk_percentages = _optional_cmyk(raw, values["id"])
-    if operation == "set-alternate" and (source_spot is None or cmyk_percentages is None):
-        raise ValueError(f"set-alternate corpus case {values['id']} requires a spot and CMYK tuple")
-    if operation not in {"rename", "remove-all", "set-alternate"}:
+    if operation in {"set-alternate", "convert"} and (
+        source_spot is None or cmyk_percentages is None
+    ):
+        raise ValueError(f"{operation} corpus case {values['id']} requires a spot and CMYK tuple")
+    if operation not in {"rename", "remove-all", "set-alternate", "convert"}:
         raise ValueError(f"unsupported corpus operation: {operation}")
     same_composite = _optional_bool(raw, "same_composite")
     different_composite = _optional_bool(raw, "different_composite")
@@ -230,6 +232,18 @@ def _run_case(case: CorpusCase, source: Path, work: Path, tools: dict[str, str])
             "-o",
             str(output),
         )
+    elif case.operation == "convert":
+        percentages = case.cmyk_percentages or ()
+        _run_spotpdf(
+            "convert",
+            str(source),
+            "--spot",
+            case.source_spot or "",
+            "--to-cmyk",
+            ",".join(f"{value:g}" for value in percentages),
+            "-o",
+            str(output),
+        )
     else:
         _run_spotpdf("remove", str(source), "--all", "-o", str(output))
 
@@ -261,6 +275,11 @@ def _verify_inventory(
             raise RuntimeError("set-alternate changed or lost the source spot inventory")
         if set(before.colorants) != set(after.colorants):
             raise RuntimeError("set-alternate changed the named-colorant inventory")
+    elif case.operation == "convert":
+        if case.source_spot not in before.colorants:
+            raise RuntimeError(f"source spot is absent before conversion: {case.source_spot}")
+        if case.source_spot in after.colorants:
+            raise RuntimeError(f"converted spot remains in inventory: {case.source_spot}")
     for name in case.remove_spots:
         if name in after.colorants:
             raise RuntimeError(f"removed spot remains in inventory: {name}")
@@ -281,6 +300,9 @@ def _verify_plates(case: CorpusCase, before: set[str], after: set[str]) -> None:
     elif case.operation == "set-alternate":
         if case.source_spot not in before or before != after:
             raise RuntimeError("set-alternate changed the Ghostscript separation plate set")
+    elif case.operation == "convert":
+        if case.source_spot not in before or case.source_spot in after:
+            raise RuntimeError("Ghostscript still reports the converted Separation plate")
     for name in case.remove_spots:
         if name not in before or name in after:
             raise RuntimeError(f"Ghostscript plate removal failed for {name}")
