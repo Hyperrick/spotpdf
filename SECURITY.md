@@ -45,6 +45,11 @@ never publishes or replaces an output, and no private temporary candidate
 remains. Defaults, API names, and exact counter semantics are documented in
 [processing budgets](docs/processing-budgets.md).
 
+The development CLI's JSON mode escapes PDF-controlled names, paths, contexts,
+and messages as data, but it does not make those values trustworthy. Parse the
+document with a JSON parser and never pass returned strings to `eval` or an
+unquoted shell command. See the [JSON automation contract](docs/json-output.md).
+
 These are refusal points, not proof that a sub-limit PDF is safe. Native qpdf
 must do work before Python can inspect the graph, and supported non-lossy content
 filters are decoded before spotpdf can measure a stream's decoded length. The

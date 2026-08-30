@@ -112,7 +112,7 @@ class SetAlternateTests(unittest.TestCase):
                             "output.pdf",
                         ]
                     )
-                self.assertEqual(raised.exception.code, 2)
+                self.assertEqual(raised.exception.code, 64)
 
     def test_programmatic_values_are_validated_before_forced_output_is_touched(self) -> None:
         source = self._make_basic_pdf(suffix="invalid-api")

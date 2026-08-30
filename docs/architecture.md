@@ -15,7 +15,10 @@ CLI
 
 ## Module responsibilities
 
-- `cli.py` owns command routing, exit codes, and human-readable output;
+- `cli.py` owns command routing and maps completed operations to exit codes;
+  `cli_parser.py` owns argument definitions, format selection, and the distinct
+  usage-error exit policy; `cli_output.py` owns explicit v1 JSON serializers,
+  stable error classification, and backward-compatible text rendering;
   `cli_limits.py` owns the shared positive-integer budget options.
 - `limits.py` owns immutable public processing configuration, metric metadata,
   and the structured budget-exceeded error.
@@ -94,6 +97,23 @@ CLI
   read-only inventory, removal rewriter, and conversion planner.
 - `objects.py` owns stable identity and cycle-safe graph traversal support.
 - `model.py` contains shared values, result types, and user-facing exceptions.
+
+## CLI output boundary
+
+The CLI does not serialize domain dataclasses generically. Each command has an
+explicit JSON serializer so new internal fields, sets, Enums, or object
+identities cannot leak into the public wire format. PDF-controlled strings are
+kept semantically exact and escaped by the JSON encoder. Derived arrays and
+keys are sorted for deterministic logs, but key order and whitespace are not
+part of the API.
+
+Format selection is parsed before command execution so a handled failure uses
+the requested stream contract. A completed command writes one JSON record to
+stdout; a handled runtime or usage failure writes one to stderr. Parser usage
+errors return `64`, which leaves `2` exclusively for the successful
+`check`-present predicate. Help and version retain argparse's text behavior.
+The versioned contract and evolution rules are normative in
+[json-output.md](json-output.md).
 
 ## Mutation pipeline
 

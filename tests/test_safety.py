@@ -8,7 +8,7 @@ import pikepdf
 
 from spotpdf.colors import discover_spot_declarations
 from spotpdf.document import remove_spot
-from spotpdf.model import InvalidPdfError
+from spotpdf.model import InvalidPdfError, NestingLimitExceededError
 from spotpdf.scan import MAX_FORM_NESTING
 
 
@@ -81,7 +81,7 @@ class SafetyRegressionTests(unittest.TestCase):
         source = self._make_deep_form_pdf()
         output = self.root / "deep-output.pdf"
 
-        with self.assertRaisesRegex(InvalidPdfError, "Form nesting exceeds"):
+        with self.assertRaisesRegex(NestingLimitExceededError, "Form nesting exceeds"):
             remove_spot(source, output, "DemoSpot")
 
         self.assertFalse(output.exists())

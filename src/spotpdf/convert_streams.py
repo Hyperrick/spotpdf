@@ -15,7 +15,12 @@ from .convert_content import ConversionContentPlanner, is_transparency_group
 from .convert_resource_contexts import build_content_resource_graph
 from .convert_state import ConversionGraphicsState
 from .inventory_graph import walk_reachable
-from .model import InvalidPdfError, SpotPdfError, UnsupportedSpotUseError
+from .model import (
+    InvalidPdfError,
+    NestingLimitExceededError,
+    SpotPdfError,
+    UnsupportedSpotUseError,
+)
 from .objects import ObjectKey, anchored_object_key, object_key
 from .scan import MAX_FORM_NESTING
 
@@ -199,7 +204,7 @@ class _StreamPlanBuilder:
         form_depth: int,
     ) -> bool:
         if form_depth > MAX_FORM_NESTING:
-            raise InvalidPdfError(
+            raise NestingLimitExceededError(
                 f"{parent_label}: Form nesting exceeds the supported limit of {MAX_FORM_NESTING}"
             )
         key = object_key(form)

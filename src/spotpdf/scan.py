@@ -18,6 +18,7 @@ from .model import (
     InspectionReport,
     InvalidPdfError,
     NameDependencyKind,
+    NestingLimitExceededError,
     SpotKind,
     UnsupportedSpotUseError,
 )
@@ -231,7 +232,7 @@ def _validate_resources(
             continue
         next_depth = form_depth + 1
         if next_depth > MAX_FORM_NESTING:
-            raise InvalidPdfError(
+            raise NestingLimitExceededError(
                 f"{context}: Form nesting exceeds the supported limit of {MAX_FORM_NESTING}"
             )
         form_resources = xobject.get(pikepdf.Name.Resources, resources)
