@@ -30,6 +30,9 @@ All notable user-visible changes are documented here. The project follows
   semantic verification pipeline, then discards the verified temporary PDF.
   Text identifies the dry run; JSON adds `dry_run: true` and omits `output`
   without changing normal mutation result shapes.
+- Wheel and source-archive Core Metadata now expose the canonical Support and
+  Security channels. The package gate requires each link exactly once in both
+  distributions before publication.
 
 ### Security
 

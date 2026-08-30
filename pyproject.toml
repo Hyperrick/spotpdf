@@ -32,6 +32,8 @@ Documentation = "https://github.com/Hyperrick/spotpdf#readme"
 Changelog = "https://github.com/Hyperrick/spotpdf/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Hyperrick/spotpdf/issues"
 Repository = "https://github.com/Hyperrick/spotpdf"
+Security = "https://github.com/Hyperrick/spotpdf/security/policy"
+Support = "https://github.com/Hyperrick/spotpdf/blob/main/SUPPORT.md"
 
 [project.scripts]
 spotpdf = "spotpdf.cli:main"

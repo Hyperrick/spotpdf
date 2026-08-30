@@ -107,8 +107,9 @@ For a `v*` tag, `.github/workflows/ci.yml`:
 6. renders the packaged Markdown long description from both archives with
    PyPI's `readme-renderer[md]`, requires them to match, and rejects ambiguous
    or resource-exhausting archive metadata without extracting it; it then runs
-   `twine check --strict` for metadata and warning checks before inspecting and
-   installing both distributions;
+   `twine check --strict` for metadata and warning checks, requires the exact
+   canonical Support and Security project URLs in both archives, and installs
+   both distributions;
 7. permits exactly one wheel, one source archive, and `SHA256SUMS` in the
    GitHub artifact, while a second immutable artifact contains only the wheel
    and source archive for PyPI;
