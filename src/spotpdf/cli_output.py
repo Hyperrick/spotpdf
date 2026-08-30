@@ -298,13 +298,13 @@ def _write_json(payload: dict[str, Any], stream: TextIO) -> None:
         stream.flush()
         binary_stream.write(record.encode("ascii"))
         binary_stream.flush()
-    except BrokenPipeError:
-        _redirect_broken_stream(stream)
+    except OSError:
+        _redirect_failed_stream(stream)
         raise
 
 
-def _redirect_broken_stream(stream: TextIO) -> None:
-    """Prevent a second broken-pipe failure during interpreter shutdown."""
+def _redirect_failed_stream(stream: TextIO) -> None:
+    """Prevent a second status-stream failure during interpreter shutdown."""
 
     try:
         stream_fd = stream.fileno()
