@@ -134,14 +134,18 @@ def _read_toml(path: Path) -> dict:
 
 def _validate_changelog(path: Path, version: str) -> None:
     text = _read_text(path)
-    match = re.search(
-        rf"(?m)^## \[{re.escape(version)}\] - ([0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}})$",
-        text,
+    releases = list(
+        re.finditer(
+            r"(?m)^## \[((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\."
+            r"(?:0|[1-9][0-9]*))\] - ([0-9]{4}-[0-9]{2}-[0-9]{2})$",
+            text,
+        )
     )
+    match = next((item for item in releases if item.group(1) == version), None)
     if match is None:
         raise ReleaseCheckError(f"missing dated {version} section in {path}")
     try:
-        date.fromisoformat(match.group(1))
+        date.fromisoformat(match.group(2))
     except ValueError as error:
         raise ReleaseCheckError(f"invalid {version} release date in {path}") from error
     expected_unreleased = (
@@ -149,6 +153,18 @@ def _validate_changelog(path: Path, version: str) -> None:
     )
     if expected_unreleased not in text:
         raise ReleaseCheckError(f"Unreleased comparison does not start at v{version} in {path}")
+
+    release_index = releases.index(match)
+    if release_index + 1 < len(releases):
+        previous_version = releases[release_index + 1].group(1)
+        expected_release = (
+            f"[{version}]: https://github.com/Hyperrick/spotpdf/compare/"
+            f"v{previous_version}...v{version}"
+        )
+        if expected_release not in text:
+            raise ReleaseCheckError(
+                f"release comparison does not cover v{previous_version}...v{version} in {path}"
+            )
 
 
 def _validate_readme(path: Path, tag: str) -> None:

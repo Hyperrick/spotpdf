@@ -5,6 +5,8 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-30
+
 ### Added
 
 - `set-alternate` command for replacing every matching Separation's composite
@@ -44,6 +46,9 @@ All notable user-visible changes are documented here. The project follows
   restricted inputs, and unsafe output aliases before publication.
 - In-memory and post-save checks bind inventory, content streams, the complete
   document graph, and every requested preview definition to the planned change.
+- Release metadata validation now binds each version's comparison link to the
+  immediately preceding dated release, and the maintainer checklist names every
+  local lock, metadata, size, corpus, benchmark, and artifact gate.
 
 ## [0.3.0] - 2026-08-30
 
@@ -121,6 +126,7 @@ First public beta release.
 - Verify saved output before atomic replacement and preserve an existing forced
   destination whenever processing fails.
 
-[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Hyperrick/spotpdf/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Hyperrick/spotpdf/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Hyperrick/spotpdf/releases/tag/v0.2.1

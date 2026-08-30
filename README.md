@@ -70,19 +70,18 @@ Python 3.11 or newer is required. Install the latest stable release as an
 isolated command with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.3.0
+uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.4.0
 spotpdf --version
 ```
 
 Or use `pipx`:
 
 ```bash
-pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.3.0
+pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.4.0
 ```
 
-The unreleased `set-alternate` command is currently available from the
-development checkout below. Stable v0.3.0 contains `list`, `check`, `rename`,
-and `remove`.
+Stable v0.4.0 contains `list`, `check`, `remove`, `rename`, and
+`set-alternate`, including the single-pass inventory used by `list`.
 
 For development, clone the repository and use the locked environment:
 
