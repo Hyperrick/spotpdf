@@ -217,12 +217,14 @@ class AlternateSafetyTests(unittest.TestCase):
 
     def test_output_alias_guards_and_file_mode_apply_to_set_alternate(self) -> None:
         source = self._basic_pdf("output-guards.pdf")
-        source.chmod(0o640)
+        if os.name != "nt":
+            source.chmod(0o640)
         output = self.root / "mode-output.pdf"
 
         set_alternate_cmyk(source, output, "Target", (0, 80, 100, 0))
 
-        self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o640)
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o640)
         hard_link = self.root / "hard-link.pdf"
         try:
             os.link(source, hard_link)
