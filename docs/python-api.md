@@ -1,9 +1,5 @@
 # Python API
 
-> [!NOTE]
-> This guide documents the package-root API on `main`, first shipping in
-> v0.7.0. Stable v0.6.0 does not expose these operations from `spotpdf` yet.
-
 `spotpdf` exposes a small synchronous Python API for the same inspected and
 verified operations as the CLI. Import supported operations, result records,
 limits, and controlled processing errors from the package root:

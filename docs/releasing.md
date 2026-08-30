@@ -36,8 +36,9 @@ before the first release and confirm that the name is still available.
    Live contribution, support, security-policy, and release-process routes stay
    untagged.
    Also update stable prose, the example `spotpdf_version` values in `README.md`
-   and `docs/json-output.md`, and the bug-report version placeholder to `X.Y.Z`
-   without the tag's `v`; remove obsolete development-only release claims.
+   and `docs/json-output.md`, and both issue-template version placeholders to
+   `X.Y.Z` without the tag's `v`; remove obsolete development-only release
+   claims.
 5. Regenerate the synthetic visuals and run every local gate:
 
    ```bash
@@ -85,7 +86,7 @@ before the first release and confirm that the name is still available.
 Do not create the tag before the release commit is in `main`. The workflow
 checks tag syntax, version agreement, changelog date and notes, one consistent
 README install channel, PyPI-safe tag-bound README links and images,
-stable-release prose, the bug-report placeholder, lockfile agreement, and
+stable-release prose, both issue-template placeholders, lockfile agreement, and
 whether the tagged commit is contained in `main`.
 
 ## Automated gates

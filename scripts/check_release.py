@@ -48,6 +48,10 @@ RELEASE_DOCUMENTS = (
     (Path("docs/processing-budgets.md"), False),
     (Path("SECURITY.md"), False),
 )
+VERSION_TEMPLATES = (
+    ("bug-report", Path(".github/ISSUE_TEMPLATE/bug_report.yml")),
+    ("question", Path(".github/ISSUE_TEMPLATE/question.yml")),
+)
 
 
 class ReleaseCheckError(ValueError):
@@ -78,10 +82,8 @@ def validate_release_metadata(root: Path, tag: str) -> str:
             version,
             require_version_example=require_version_example,
         )
-    _validate_bug_report_template(
-        root / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml",
-        version,
-    )
+    for label, relative_path in VERSION_TEMPLATES:
+        _validate_issue_template_version(root / relative_path, version, label=label)
     render_release_notes(root, version)
     return version
 
@@ -440,14 +442,14 @@ def _validate_version_examples(text: str, path: Path, version: str, *, required:
         )
 
 
-def _validate_bug_report_template(path: Path, version: str) -> None:
+def _validate_issue_template_version(path: Path, version: str, *, label: str) -> None:
     text = _read_text(path)
     pattern = re.compile(
         rf"(?m)^\s*placeholder:\s*[\"']spotpdf\s+({VERSION_PATTERN.pattern})[\"']\s*$"
     )
     if pattern.findall(text) != [version]:
         raise ReleaseCheckError(
-            f"bug-report version placeholder does not uniquely use {version} in {path}"
+            f"{label} version placeholder does not uniquely use {version} in {path}"
         )
 
 

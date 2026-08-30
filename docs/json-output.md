@@ -77,7 +77,7 @@ A successful inventory has this shape:
     "input": "input.pdf"
   },
   "schema_version": "spotpdf.cli/v1",
-  "spotpdf_version": "0.6.0"
+  "spotpdf_version": "0.7.0"
 }
 ```
 
@@ -100,7 +100,7 @@ A handled failure has this shape:
   "exit_code": 1,
   "ok": false,
   "schema_version": "spotpdf.cli/v1",
-  "spotpdf_version": "0.6.0"
+  "spotpdf_version": "0.7.0"
 }
 ```
 
@@ -127,11 +127,6 @@ Normal mutation results retain their existing v1 shape: they include `input`
 and `output` and do not include `dry_run`. A successful dry run instead includes
 `"dry_run":true` and omits `output`; all other command-specific result fields
 are identical to a normal run. For example, the result fragment is:
-
-> [!NOTE]
-> `--dry-run` is unreleased and available on `main`; it is not included in
-> stable v0.6.0. Install from a source checkout to use it before the next
-> release.
 
 ```json
 {"result":{"dry_run":true,"input":"input.pdf","selection":{"mode":"spot","spot":"Varnish"},"stats":{"changed":true,"fills_removed":1,"forms_changed":0,"pages_changed":[1],"resources_removed":1,"strokes_removed":0,"text_blocks":0,"text_show_operations":0}}}
@@ -168,7 +163,7 @@ changes to the sentence used by the default text output.
 A present name is a successfully evaluated predicate:
 
 ```json
-{"command":"check","exit_code":2,"ok":true,"result":{"input":"input.pdf","present":true,"spot":"Varnish"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.6.0"}
+{"command":"check","exit_code":2,"ok":true,"result":{"input":"input.pdf","present":true,"spot":"Varnish"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.7.0"}
 ```
 
 ### `remove`
