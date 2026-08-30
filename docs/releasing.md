@@ -17,9 +17,13 @@ GitHub assets.
 
    ```bash
    uv sync --locked --dev
+   uv lock --check
+   uv run python scripts/check_release.py metadata --tag vX.Y.Z
    uv run python scripts/create_docs_images.py
+   git diff --check
    uv run ruff check .
    uv run ruff format --check .
+   uv run python scripts/check_python_size.py
    uv run python -m unittest discover -s tests -v
    uv run python scripts/benchmark_inventory.py --runs 9 \
      --output tmp/inventory-benchmark.json
@@ -27,6 +31,8 @@ GitHub assets.
    uv build --no-build-isolation --out-dir tmp/release-dist
    uv run python scripts/check_distribution.py tmp/release-dist
    uv run python scripts/smoke_distributions.py tmp/release-dist
+   uv run python scripts/check_release.py prepare-assets \
+     --version X.Y.Z --dist tmp/release-dist
    ```
 
 6. Merge the release pull request and wait for the protected `Package` check on

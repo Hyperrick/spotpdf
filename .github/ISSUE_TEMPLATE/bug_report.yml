@@ -14,7 +14,7 @@ body:
     attributes:
       label: spotpdf version
       description: Paste the exact output of `spotpdf --version`.
-      placeholder: "spotpdf 0.3.0"
+      placeholder: "spotpdf 0.4.0"
     validations:
       required: true
   - type: input

@@ -40,7 +40,11 @@ class ReleaseMetadataTests(unittest.TestCase):
             "# Changelog\n\n"
             f"## [{changelog_version}] - 2026-08-30\n\n"
             "Release notes.\n\n"
-            f"[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v{changelog_version}...HEAD\n",
+            "## [0.2.1] - 2026-08-29\n\n"
+            "Previous release.\n\n"
+            f"[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v{changelog_version}...HEAD\n"
+            f"[{changelog_version}]: https://github.com/Hyperrick/spotpdf/compare/"
+            f"v0.2.1...v{changelog_version}\n",
             encoding="utf-8",
         )
         (self.root / "README.md").write_text(
@@ -87,6 +91,17 @@ class ReleaseMetadataTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ReleaseCheckError, "invalid 0.3.0 release date"):
+            validate_release_metadata(self.root, "v0.3.0")
+
+        self._write_metadata()
+        changelog.write_text(
+            changelog.read_text(encoding="utf-8").replace(
+                "compare/v0.2.1...v0.3.0",
+                "compare/v0.2.0...v0.3.0",
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ReleaseCheckError, "release comparison"):
             validate_release_metadata(self.root, "v0.3.0")
 
     def test_readme_must_have_both_stable_install_commands(self) -> None:
