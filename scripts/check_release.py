@@ -24,6 +24,10 @@ README_STABLE_VERSION_PATTERN = re.compile(
 )
 README_DEVELOPMENT_ONLY_PATTERN = re.compile(
     rf"\bcurrent +development +branch\b|"
+    rf"\bcurrent +development +version\b|"
+    rf"\bdevelopment +CLI(?:'s)?\b|"
+    rf"\bnext +release\b|"
+    rf"\bunreleased\b|"
     rf"\bnot +(?:yet +)?included +in +(?:the +)?stable(?: +release)? +"
     rf"v{VERSION_PATTERN.pattern}(?: +release)?\b|"
     rf"\b(?:is|are) +(?:available|included|present|supported) +only"
@@ -34,6 +38,11 @@ README_DEVELOPMENT_ONLY_PATTERN = re.compile(
 )
 MARKDOWN_LINK_PATTERN = re.compile(r"\[([^\]\r\n]+)\]\([^\)\r\n]*\)")
 TRAILING_PROSE_PUNCTUATION = ".,;:!?)]}\u2013\u2014"
+RELEASE_DOCUMENTS = (
+    (Path("docs/json-output.md"), True),
+    (Path("docs/processing-budgets.md"), False),
+    (Path("SECURITY.md"), False),
+)
 
 
 class ReleaseCheckError(ValueError):
@@ -58,6 +67,12 @@ def validate_release_metadata(root: Path, tag: str) -> str:
 
     _validate_changelog(root / "CHANGELOG.md", version)
     _validate_readme(root / "README.md", tag)
+    for relative_path, require_version_example in RELEASE_DOCUMENTS:
+        _validate_release_document(
+            root / relative_path,
+            version,
+            require_version_example=require_version_example,
+        )
     _validate_bug_report_template(
         root / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml",
         version,
@@ -384,6 +399,46 @@ def _validate_readme(path: Path, tag: str) -> None:
         )
     if README_DEVELOPMENT_ONLY_PATTERN.search(prose) is not None:
         raise ReleaseCheckError(f"README contains a development-only release claim in {path}")
+    _validate_version_examples(text, path, version, required=True)
+
+
+def _validate_release_document(
+    path: Path,
+    version: str,
+    *,
+    require_version_example: bool,
+) -> None:
+    """Reject stale stable-version and development-only release documentation."""
+
+    text = _read_text(path)
+    prose = _normalized_markdown_prose(text)
+    if README_DEVELOPMENT_ONLY_PATTERN.search(prose) is not None:
+        raise ReleaseCheckError(f"development-only release claim remains in {path}")
+
+    stable_tokens = [
+        token.rstrip(TRAILING_PROSE_PUNCTUATION)
+        for token in README_STABLE_VERSION_PATTERN.findall(prose)
+    ]
+    if stable_tokens and set(stable_tokens) != {version}:
+        raise ReleaseCheckError(
+            f"stable release prose does not exclusively use v{version} in {path}: {stable_tokens}"
+        )
+    _validate_version_examples(text, path, version, required=require_version_example)
+
+
+def _validate_version_examples(text: str, path: Path, version: str, *, required: bool) -> None:
+    """Bind machine-output examples to the package version being released."""
+
+    pattern = re.compile(
+        r'["\']spotpdf_version["\']\s*:\s*(?P<quote>["\'])(?P<value>[^"\']*)(?P=quote)'
+    )
+    examples = [match.group("value") for match in pattern.finditer(text)]
+    if required and not examples:
+        raise ReleaseCheckError(f"missing spotpdf_version example in {path}")
+    if examples and set(examples) != {version}:
+        raise ReleaseCheckError(
+            f"spotpdf_version examples do not exclusively use {version} in {path}: {examples}"
+        )
 
 
 def _validate_bug_report_template(path: Path, version: str) -> None:

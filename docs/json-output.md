@@ -5,10 +5,6 @@ input-processing command. This interface is intended for Enfocus Switch,
 watched folders, CI pipelines, and other programs that must not parse changing
 human-readable prose.
 
-> [!NOTE]
-> The JSON interface described here is present on the current development
-> branch and is not included in stable v0.5.0.
-
 ## Invoke JSON mode
 
 Use the global option before the command:
@@ -80,7 +76,7 @@ A successful inventory has this shape:
     "input": "input.pdf"
   },
   "schema_version": "spotpdf.cli/v1",
-  "spotpdf_version": "0.5.0"
+  "spotpdf_version": "0.6.0"
 }
 ```
 
@@ -103,7 +99,7 @@ A handled failure has this shape:
   "exit_code": 1,
   "ok": false,
   "schema_version": "spotpdf.cli/v1",
-  "spotpdf_version": "0.5.0"
+  "spotpdf_version": "0.6.0"
 }
 ```
 
@@ -148,7 +144,7 @@ changes to the sentence used by the default text output.
 A present name is a successfully evaluated predicate:
 
 ```json
-{"command":"check","exit_code":2,"ok":true,"result":{"input":"input.pdf","present":true,"spot":"Varnish"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.5.0"}
+{"command":"check","exit_code":2,"ok":true,"result":{"input":"input.pdf","present":true,"spot":"Varnish"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.6.0"}
 ```
 
 ### `remove`
@@ -228,13 +224,12 @@ the stable code and treat the message only as diagnostic text.
 | `2` | `check` reported present; `ok` is true. |
 | `64` | CLI usage or option-value error; `ok` is false. |
 
-Help and version exit with `0` and remain text. Stable v0.5.0 used `2` for
-argument errors; reserving `64` makes `2` unambiguous from the next release.
+Help and version exit with `0` and remain text. In v0.6.0 and later, argument
+errors use `64`, leaving `2` unambiguous for a successful present result.
 
 ## Enfocus Switch
 
-This recipe requires the current development version or the next release; the
-stable v0.5.0 CLI does not have JSON mode or usage exit `64`.
+This recipe requires spotpdf v0.6.0 or later.
 
 For a removal step using **Execute command App v11**
 ([Switch 2022 Fall or newer](https://www0.enfocus.com/en/appstore/product/execute-command)):
