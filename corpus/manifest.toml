@@ -1,0 +1,89 @@
+version = 1
+
+[[case]]
+id = "ghostscript-spots2"
+filename = "ghost-spots2.pdf"
+source = "Ghostscript examples/spots2.pdf"
+source_commit = "f13745a17ff7af385d70d230c3d8594e501d6b6b"
+url = "https://raw.githubusercontent.com/ArtifexSoftware/ghostpdl/f13745a17ff7af385d70d230c3d8594e501d6b6b/examples/spots2.pdf"
+sha256 = "c1b1ac004f2160eaf721618fa4f7503d387dc78bcc702a2fef0a11419216430b"
+bytes = 3040
+license = "AGPL-3.0-or-later"
+license_url = "https://github.com/ArtifexSoftware/ghostpdl/blob/f13745a17ff7af385d70d230c3d8594e501d6b6b/LICENSE"
+operation = "remove-all"
+remove_spots = ["MuddyBlack", "MuddyCyan", "MuddyMagenta"]
+expect_empty_inventory = true
+
+[[case]]
+id = "verapdf-separation-cmyk"
+filename = "veraPDF-test-suite-6-2-4-4-t01-pass-b.pdf"
+source = "veraPDF corpus PDF/A-2b 6.2.4.4 t01-pass-b"
+source_commit = "01e40281d48e2f3755006fdf596ca25caaea8634"
+url = "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/01e40281d48e2f3755006fdf596ca25caaea8634/PDF_A-2b/6.2%20Graphics/6.2.4.4%20Separation%20and%20DeviceN%20colour%20spaces/veraPDF%20test%20suite%206-2-4-4-t01-pass-b.pdf"
+sha256 = "6f81feb3b805e24b5de34cb5a7bd2f64ebce9818b23c953865d4590feb13abd0"
+bytes = 492362
+license = "CC-BY-4.0"
+license_url = "https://github.com/veraPDF/veraPDF-corpus/blob/01e40281d48e2f3755006fdf596ca25caaea8634/README.md"
+operation = "rename"
+source_spot = "Custom"
+destination_spot = "ReleaseGateCustom"
+same_composite = true
+
+[[case]]
+id = "verapdf-devicen-colorants"
+filename = "veraPDF-test-suite-6-2-4-4-t01-pass-c.pdf"
+source = "veraPDF corpus PDF/A-2b 6.2.4.4 t01-pass-c"
+source_commit = "01e40281d48e2f3755006fdf596ca25caaea8634"
+url = "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/01e40281d48e2f3755006fdf596ca25caaea8634/PDF_A-2b/6.2%20Graphics/6.2.4.4%20Separation%20and%20DeviceN%20colour%20spaces/veraPDF%20test%20suite%206-2-4-4-t01-pass-c.pdf"
+sha256 = "69d2bbb041447d828378de5ca3b53af14e8f9ed64946e3488fe7d5f886f561e3"
+bytes = 8811
+license = "CC-BY-4.0"
+license_url = "https://github.com/veraPDF/veraPDF-corpus/blob/01e40281d48e2f3755006fdf596ca25caaea8634/README.md"
+operation = "rename"
+source_spot = "Red"
+destination_spot = "ReleaseGateRed"
+same_composite = true
+
+[[case]]
+id = "verapdf-separation-rgb"
+filename = "veraPDF-test-suite-6-2-4-4-t01-pass-f.pdf"
+source = "veraPDF corpus PDF/A-2b 6.2.4.4 t01-pass-f"
+source_commit = "01e40281d48e2f3755006fdf596ca25caaea8634"
+url = "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/01e40281d48e2f3755006fdf596ca25caaea8634/PDF_A-2b/6.2%20Graphics/6.2.4.4%20Separation%20and%20DeviceN%20colour%20spaces/veraPDF%20test%20suite%206-2-4-4-t01-pass-f.pdf"
+sha256 = "ec5d76083b16183373058cdbfe83dda51e167377a88c7c255d2f856bb2e24109"
+bytes = 7836
+license = "CC-BY-4.0"
+license_url = "https://github.com/veraPDF/veraPDF-corpus/blob/01e40281d48e2f3755006fdf596ca25caaea8634/README.md"
+operation = "rename"
+source_spot = "Custom"
+destination_spot = "ReleaseGateCustom"
+same_composite = true
+
+[[case]]
+id = "verapdf-nchannel-process"
+filename = "veraPDF-test-suite-6-2-4-4-t02-pass-a.pdf"
+source = "veraPDF corpus PDF/A-2b 6.2.4.4 t02-pass-a"
+source_commit = "01e40281d48e2f3755006fdf596ca25caaea8634"
+url = "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/01e40281d48e2f3755006fdf596ca25caaea8634/PDF_A-2b/6.2%20Graphics/6.2.4.4%20Separation%20and%20DeviceN%20colour%20spaces/veraPDF%20test%20suite%206-2-4-4-t02-pass-a.pdf"
+sha256 = "a5bd28bbb4952540e7e2f6b3ebcb5ecc080cc2ddafeefc0db5830d595530c8df"
+bytes = 393545
+license = "CC-BY-4.0"
+license_url = "https://github.com/veraPDF/veraPDF-corpus/blob/01e40281d48e2f3755006fdf596ca25caaea8634/README.md"
+operation = "remove-all"
+preserve_names = ["PrCyan", "PrMagenta", "PrYellow", "Black"]
+byte_identical = true
+
+[[case]]
+id = "verapdf-multipage-separation"
+filename = "veraPDF-test-suite-6-2-4-4-t03-pass-a.pdf"
+source = "veraPDF corpus PDF/A-2b 6.2.4.4 t03-pass-a"
+source_commit = "01e40281d48e2f3755006fdf596ca25caaea8634"
+url = "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/01e40281d48e2f3755006fdf596ca25caaea8634/PDF_A-2b/6.2%20Graphics/6.2.4.4%20Separation%20and%20DeviceN%20colour%20spaces/veraPDF%20test%20suite%206-2-4-4-t03-pass-a.pdf"
+sha256 = "94a1c04d470275dc5f335cbca0e3a49c1a6c45d59b26d7c2f676da15bb7075cf"
+bytes = 5297
+license = "CC-BY-4.0"
+license_url = "https://github.com/veraPDF/veraPDF-corpus/blob/01e40281d48e2f3755006fdf596ca25caaea8634/README.md"
+operation = "rename"
+source_spot = "Red"
+destination_spot = "ReleaseGateRed"
+same_composite = true

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="820" viewBox="0 0 1440 820">
+  <title>spotpdf atomic rename CLI walkthrough</title>
+  <desc>The Varnish plate is renamed with a pixel-identical render.</desc>
+  <rect width="1440" height="820" fill="#f5f7fb"/>
+  <rect width="1440" height="168" fill="#0e1422"/>
+  <text x="72" y="78" fill="#ffffff" font-family="Helvetica,Arial,sans-serif" font-size="42" font-weight="700">Atomic spot-plate rename</text>
+  <text x="72" y="124" fill="#c8d0df" font-family="Helvetica,Arial,sans-serif" font-size="24">The plate name changes. Composite pixels, tints, and vector content do not.</text>
+  <rect x="70" y="210" width="630" height="438" rx="16" fill="#111827"/>
+  <rect x="730" y="210" width="640" height="438" rx="16" fill="#111827"/>
+  <circle cx="102" cy="242" r="7" fill="#fb7185"/><circle cx="126" cy="242" r="7" fill="#fbbf24"/><circle cx="150" cy="242" r="7" fill="#34d399"/>
+  <circle cx="762" cy="242" r="7" fill="#fb7185"/><circle cx="786" cy="242" r="7" fill="#fbbf24"/><circle cx="810" cy="242" r="7" fill="#34d399"/>
+  <text x="86" y="286" fill="#93c5fd" font-family="Courier New,monospace" font-size="20">$ spotpdf list demo.pdf</text>
+  <text x="746" y="286" fill="#93c5fd" font-family="Courier New,monospace" font-size="20">$ spotpdf list renamed.pdf</text>
+  <text x="86" y="326" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">NAME             ROLE  KIND        PAGES  PAINT OPS  STATUS</text>
+  <text x="86" y="368" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">CutContour       spot  Separation  1      2          painted</text>
+  <text x="86" y="410" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">Personalization  spot  Separation  1      1          painted</text>
+  <text x="86" y="452" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">Varnish          spot  Separation  1      1          painted</text>
+  <text x="746" y="326" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">NAME             ROLE  KIND        PAGES  PAINT OPS  STATUS</text>
+  <text x="746" y="368" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">CutContour       spot  Separation  1      2          painted</text>
+  <text x="746" y="410" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">Personalization  spot  Separation  1      1          painted</text>
+  <text x="746" y="452" fill="#e5e7eb" font-family="Courier New,monospace" font-size="15">Varnish Renamed  spot  Separation  1      1          painted</text>
+  <text x="72" y="700" fill="#111827" font-family="Courier New,monospace" font-size="20">$ spotpdf rename demo.pdf --spot Varnish --to &quot;Varnish Renamed&quot; -o renamed.pdf</text>
+  <text x="72" y="738" fill="#374151" font-family="Courier New,monospace" font-size="17">Renamed &#x27;Varnish&#x27; to &#x27;Varnish Renamed&#x27; in 1 color-space definition(s) and 0 inventoried exact-name reference(s)</text>
+  <rect x="72" y="768" width="228" height="34" rx="17" fill="#dcfce7"/><text x="91" y="791" fill="#166534" font-family="Helvetica,Arial,sans-serif" font-size="16" font-weight="700">OLD NAME ABSENT</text>
+  <rect x="318" y="768" width="230" height="34" rx="17" fill="#dbeafe"/><text x="337" y="791" fill="#1e40af" font-family="Helvetica,Arial,sans-serif" font-size="16" font-weight="700">NEW NAME PRESENT</text>
+  <rect x="566" y="768" width="260" height="34" rx="17" fill="#f3e8ff"/><text x="585" y="791" fill="#6b21a8" font-family="Helvetica,Arial,sans-serif" font-size="16" font-weight="700">PIXEL-IDENTICAL RENDER</text>
+</svg>

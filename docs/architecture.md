@@ -31,6 +31,8 @@ CLI
 - `rename_slots.py` owns physical name application, invariants, exact-slot
   normalization, and semantic fingerprints for planned contexts and the full
   trailer-reachable document graph.
+- `metadata_fingerprint.py` owns fail-closed XML Metadata comparison, including
+  XMP packet grammar, scoped namespaces, and canonicalized XML meaning.
 - `inventory.py` assembles the role-aware Separation/DeviceN/NChannel report.
 - `inventory_graph.py` owns iterative reachable-object traversal and location
   propagation.
@@ -86,6 +88,13 @@ The whole-document guard masks only the exact slots in that plan while comparing
 the pre- and post-apply graph. A second exact post-apply fingerprint includes
 catalog, page tree, document information, and other semantic trailer entries and
 must still match after the temporary output is reopened.
+
+Decoded streams remain byte-sensitive. The only storage normalization is for a
+valid `/Type /Metadata` plus `/Subtype /XML` stream: the XML root, comments,
+processing instructions, scoped namespace bindings, and meaningful XMP packet
+fields are fingerprinted semantically. Invalid XML, DTD-bearing XML, malformed
+packet wrappers, and XML above the small canonicalization guard are compared as
+decoded raw bytes instead.
 
 ## Resource limits
 
