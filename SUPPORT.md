@@ -16,10 +16,10 @@ time or private file-analysis service.
   [GitHub private vulnerability reporting](https://github.com/Hyperrick/spotpdf/security/advisories/new).
   Do not disclose it in a public issue.
 
-Search the existing issues first. A fail-closed refusal for a construct listed as
-unsupported in [PDF compatibility](docs/compatibility.md) is expected behavior,
-not silent data loss. A narrowly scoped request to support that construct is still
-welcome.
+Check the [troubleshooting guide](docs/troubleshooting.md) and search the existing
+issues first. A fail-closed refusal for a construct listed as unsupported in
+[PDF compatibility](docs/compatibility.md) is expected behavior, not silent data
+loss. A narrowly scoped request to support that construct is still welcome.
 
 ## What to include
 
@@ -38,6 +38,7 @@ document names, spot names, job identifiers, and similar customer data with clea
 placeholders while preserving the structure needed to understand the problem.
 
 The [quick start](README.md#quick-start),
+[troubleshooting guide](docs/troubleshooting.md),
 [compatibility matrix](docs/compatibility.md), and
 [JSON automation guide](docs/json-output.md) cover the supported operations and
 stable automation contract.

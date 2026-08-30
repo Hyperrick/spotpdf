@@ -37,6 +37,9 @@ All notable user-visible changes are documented here. The project follows
   macOS and Debian/Ubuntu installation commands, adds POSIX and PowerShell
   verification, and distinguishes Poppler-only documentation/rename rendering
   from qpdf/Ghostscript convert-render and release-corpus requirements.
+- An actionable troubleshooting guide maps common fail-closed errors to causes
+  and safe next steps without treating `--force`, higher budgets, or PDF-object
+  patching as ways to bypass unsupported semantics and document restrictions.
 
 ### Security
 
