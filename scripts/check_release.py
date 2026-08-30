@@ -9,6 +9,11 @@ import tomllib
 from datetime import date
 from pathlib import Path
 
+if __package__:
+    from .release_readme import ReleaseReadmeError, validate_release_readme
+else:
+    from release_readme import ReleaseReadmeError, validate_release_readme
+
 PROJECT_NAME = "spotpdf"
 VERSION_PATTERN = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
 CHECKSUM_PATTERN = re.compile(r"([0-9a-f]{64})  ([^/]+)")
@@ -368,17 +373,11 @@ def _reference_lines(text: str, label: str) -> list[str]:
 
 def _validate_readme(path: Path, tag: str) -> None:
     text = _read_text(path)
-    repository = "git+https://github.com/Hyperrick/spotpdf.git"
     version = tag[1:]
-    for command in ("uv tool install", "pipx install"):
-        pattern = re.compile(
-            rf"(?m)^{re.escape(command)}[ \t]+{re.escape(repository)}@v"
-            rf"({VERSION_PATTERN.pattern})[ \t]*$"
-        )
-        if pattern.findall(text) != [version]:
-            raise ReleaseCheckError(
-                f"stable install command {command!r} does not uniquely use {tag} in {path}"
-            )
+    try:
+        validate_release_readme(path, text, tag)
+    except ReleaseReadmeError as error:
+        raise ReleaseCheckError(str(error)) from error
 
     prose = _normalized_markdown_prose(text)
     stable_tokens = [

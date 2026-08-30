@@ -42,6 +42,8 @@ uv run python -m unittest discover -s tests -v
 uv run python scripts/benchmark_inventory.py --runs 3
 artifact_dir="$(mktemp -d)"
 uv build --no-build-isolation --out-dir "$artifact_dir"
+uv run --group release --locked twine check --strict \
+  "$artifact_dir"/*.whl "$artifact_dir"/*.tar.gz
 uv run python scripts/check_distribution.py "$artifact_dir"
 uv run python scripts/smoke_distributions.py "$artifact_dir"
 ```
@@ -122,7 +124,11 @@ default, including mixed-case extensions. Repository-relative Markdown
 destinations and repository-relative targets in HTML `href`, `src`, and
 `srcset` attributes may only point to tracked files; ignored local files are
 deliberately not accepted. External URLs and URL fragments are outside this
-check's scope, but the file path before a fragment is still validated.
+check's scope, but the file path before a fragment is still validated. The
+package README has a stricter release gate: repository content must use absolute
+URLs bound to the exact release tag so links and images also work on PyPI.
+Contribution, support, security-policy, and release-process routes are the
+deliberate live-policy exceptions.
 
 ## Design rules
 
