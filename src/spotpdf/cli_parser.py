@@ -127,12 +127,8 @@ def build_parser() -> argparse.ArgumentParser:
             "canonical Cyan/Magenta/Yellow/Black, and reserved /All and /None"
         ),
     )
-    remove_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
-    remove_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="replace an existing output after validation",
-    )
+    _add_mutation_destination(remove_parser)
+    _add_force(remove_parser)
 
     rename_parser = commands.add_parser(
         "rename",
@@ -142,12 +138,8 @@ def build_parser() -> argparse.ArgumentParser:
     rename_parser.add_argument("input", type=Path, help="input PDF")
     rename_parser.add_argument("--spot", required=True, help="exact source spot name")
     rename_parser.add_argument("--to", required=True, dest="destination", help="exact target name")
-    rename_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
-    rename_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="replace an existing output after validation",
-    )
+    _add_mutation_destination(rename_parser)
+    _add_force(rename_parser)
 
     alternate_parser = commands.add_parser(
         "set-alternate",
@@ -163,12 +155,8 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="C,M,Y,K",
         help="four finite CMYK percentages in the inclusive range 0..100",
     )
-    alternate_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
-    alternate_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="replace an existing output after validation",
-    )
+    _add_mutation_destination(alternate_parser)
+    _add_force(alternate_parser)
 
     convert_parser = commands.add_parser(
         "convert",
@@ -193,12 +181,8 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="C,M,Y,K",
         help="operator-supplied C,M,Y,K percentages in the inclusive range 0..100",
     )
-    convert_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
-    convert_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="replace an existing output after validation",
-    )
+    _add_mutation_destination(convert_parser)
+    _add_force(convert_parser)
     for command_parser in (
         list_parser,
         check_parser,
@@ -210,6 +194,29 @@ def build_parser() -> argparse.ArgumentParser:
         _add_output_format(command_parser, default=argparse.SUPPRESS)
         add_processing_limit_arguments(command_parser)
     return parser
+
+
+def _add_mutation_destination(parser: argparse.ArgumentParser) -> None:
+    """Require either a published output or a fully verified dry run."""
+
+    destination = parser.add_mutually_exclusive_group(required=True)
+    destination.add_argument("-o", "--output", type=Path, help="publish the verified output PDF")
+    destination.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "perform the full rewrite and post-save verification in temporary storage, "
+            "then discard it"
+        ),
+    )
+
+
+def _add_force(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace an existing output after validation; has no effect with --dry-run",
+    )
 
 
 def _add_output_format(parser: argparse.ArgumentParser, *, default: object) -> None:

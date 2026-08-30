@@ -187,6 +187,8 @@ class JsonCliTests(JsonCliTestCase):
         )
         self.assertEqual(convert["input"], str(convert_source))
         self.assertEqual(convert["output"], str(convert_output))
+        for result in (remove, remove_all, rename, alternate, convert):
+            self.assertNotIn("dry_run", result)
         for output in (
             remove_output,
             remove_all_output,

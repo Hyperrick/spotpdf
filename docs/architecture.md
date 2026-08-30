@@ -19,7 +19,9 @@ CLI
   `cli_parser.py` owns argument definitions, format selection, and the distinct
   usage-error exit policy; `cli_output.py` owns explicit v1 JSON serializers,
   stable error classification, and backward-compatible text rendering;
-  `cli_limits.py` owns the shared positive-integer budget options.
+  `cli_limits.py` owns the shared positive-integer budget options; and
+  `cli_dry_run.py` owns private, automatically discarded destinations for
+  fully serialized and verified mutation dry runs.
 - `limits.py` owns immutable public processing configuration, metric metadata,
   and the structured budget-exceeded error.
 - `budget_preflight.py` owns the fixed-order source audit and usage record;
@@ -127,7 +129,7 @@ input-byte check
   → qpdf syntax check and final warnings
   → declaration inventory
   → mutation preflight
-  → complete rename/alternate/conversion plan or removal dry run
+  → complete rename/alternate/conversion plan or internal removal dry run
   → in-memory rewrite
   → in-memory semantic check
   → save to sibling temporary file
@@ -142,12 +144,13 @@ requested.
 ## Why planning and apply are separate
 
 Removal semantics can depend on inherited graphics state, Form resources, and
-text rendering modes, so removal performs a full dry run. Rename first builds a
-deduplicated plan containing every definition slot and supported exact-name
-reference. `set-alternate` builds a deduplicated one-to-one plan for every target
-Separation and rejects target-related DeviceN use. Conversion builds exact
-target-resource deletions and stateful page/Form stream replacements. In every
-case the plan is known to be complete before any in-memory object is changed.
+text rendering modes, so removal performs a full internal dry run. Rename first
+builds a deduplicated plan containing every definition slot and supported
+exact-name reference. `set-alternate` builds a deduplicated one-to-one plan for
+every target Separation and rejects target-related DeviceN use. Conversion
+builds exact target-resource deletions and stateful page/Form stream
+replacements. In every case the plan is known to be complete before any
+in-memory object is changed.
 Removal currently pays for a second stream parse; rename and alternate-preview
 changes do not interpret or rewrite paint operands. They parse page and Form
 content syntax after saving and compare location-bound decoded stream hashes.

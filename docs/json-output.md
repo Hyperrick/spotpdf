@@ -43,8 +43,9 @@ One invocation produces at most one JSON document:
 - no table header, `spotpdf: error:` prefix, usage preamble, warning, or
   traceback surrounds a JSON object.
 
-The command may still create a PDF output. JSON is the status record, not a
-replacement for that output file.
+A normal mutation still creates a PDF output. JSON is the status record, not a
+replacement for that output file. A mutation invoked with `--dry-run` never
+publishes an output.
 
 The one-record guarantee assumes stdout and stderr remain writable. If a
 consumer closes a status pipe, spotpdf returns a transport `io_error` on the
@@ -121,6 +122,29 @@ reproducible.
 
 ## Command results
 
+Every mutating command requires exactly one of `-o/--output` or `--dry-run`.
+Normal mutation results retain their existing v1 shape: they include `input`
+and `output` and do not include `dry_run`. A successful dry run instead includes
+`"dry_run":true` and omits `output`; all other command-specific result fields
+are identical to a normal run. For example, the result fragment is:
+
+> [!NOTE]
+> `--dry-run` is unreleased and available on `main`; it is not included in
+> stable v0.6.0. Install from a source checkout to use it before the next
+> release.
+
+```json
+{"result":{"dry_run":true,"input":"input.pdf","selection":{"mode":"spot","spot":"Varnish"},"stats":{"changed":true,"fills_removed":1,"forms_changed":0,"pages_changed":[1],"resources_removed":1,"strokes_removed":0,"text_blocks":0,"text_show_operations":0}}}
+```
+
+This is a verified execution mode, not a read-only estimate. The same input
+budgets, safety analysis, in-memory mutation, serialization, strict reopen, and
+semantic verification run against a private temporary PDF. That PDF is deleted
+before the success record is written. Handled mutation failures preserve the
+normal exit/error contract and remove the dry-run PDF during context cleanup. A
+filesystem cleanup failure is itself reported as an `io_error` before any
+success record. `--force` has no effect in this mode.
+
 ### `list`
 
 `result` contains `input`, `colorant_count`, and `colorants`. Each colorant has
@@ -156,7 +180,9 @@ Exact selection contains:
 ```
 
 All-mode selection contains `"selection":{"mode":"all"}` plus the sorted
-`spots_removed` array. Both modes include `input`, `output`, and `stats`.
+`spots_removed` array. Both modes include `input` and `stats`, plus the
+publication field described above: `output` for a normal mutation or
+`dry_run:true` for a dry run.
 
 Removal `stats` always has:
 
@@ -170,27 +196,31 @@ Removal `stats` always has:
 - `resources_removed`.
 
 In all-mode, if nothing is removable, `spots_removed` and `pages_changed` are
-empty, `changed` is false, every counter is zero, and the input is still copied
-byte-for-byte to the requested output. Exact-name mode does not include a
+empty, `changed` is false, and every counter is zero. A normal run still copies
+the input byte-for-byte to the requested output; a dry run verifies that same
+private copy and then discards it. Exact-name mode does not include a
 `spots_removed` field.
 
 ### `rename`
 
-`result` contains `input`, `output`, `source`, `destination`,
-`definitions_renamed`, and `references_renamed`.
+`result` contains `input`, `source`, `destination`, `definitions_renamed`, and
+`references_renamed`, plus `output` or `dry_run:true` according to the shared
+mutation rule above.
 
 ### `set-alternate`
 
-`result` contains `input`, `output`, `spot`, four numeric
-`cmyk_percentages`, and `definitions_changed`. Percentages report the values
-actually stored after PDF-number normalization.
+`result` contains `input`, `spot`, four numeric `cmyk_percentages`, and
+`definitions_changed`, plus `output` or `dry_run:true` according to the shared
+mutation rule above. Percentages report the values actually stored after
+PDF-number normalization.
 
 ### `convert`
 
-`result` contains `input`, `output`, `spot`, four numeric
-`cmyk_percentages`, `definitions_removed`, `resources_removed`,
+`result` contains `input`, `spot`, four numeric `cmyk_percentages`,
+`definitions_removed`, `resources_removed`,
 `page_content_sequences_changed`, `forms_changed`,
-`color_operators_rewritten`, and sorted `pages_affected`.
+`color_operators_rewritten`, and sorted `pages_affected`, plus `output` or
+`dry_run:true` according to the shared mutation rule above.
 
 ## Error codes
 
@@ -284,6 +314,19 @@ Capture a mutating command without mixing success and error records:
 if spotpdf --format json remove input.pdf --all -o output.pdf \
     > result.json 2> error.json; then
   jq -e '.ok == true and .command == "remove"' result.json
+else
+  jq . error.json >&2
+  exit 1
+fi
+```
+
+Preflight the same mutation without creating `output.pdf`:
+
+```bash
+if spotpdf --format json remove input.pdf --all --dry-run \
+    > result.json 2> error.json; then
+  jq -e '.ok == true and .result.dry_run == true and
+         (.result | has("output") | not)' result.json
 else
   jq . error.json >&2
   exit 1

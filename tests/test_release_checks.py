@@ -201,6 +201,8 @@ class ReleaseMetadataTests(unittest.TestCase):
         claims = (
             "The current development branch additionally contains convert.\n",
             "These controls are not included in the stable v0.3.0 release.\n",
+            "`--dry-run` is unreleased and available on main; it is not included "
+            "in stable v0.3.0.\n",
             "The convert command is available only on the development branch.\n",
             "The convert command is available only on the development\nbranch.\n",
         )
@@ -262,6 +264,11 @@ class ReleaseMetadataTests(unittest.TestCase):
     def test_release_documents_reject_development_only_claims(self) -> None:
         claims = (
             ("docs/json-output.md", "This requires the next release.\n"),
+            (
+                "docs/json-output.md",
+                "`--dry-run` is unreleased and available on main; it is not included "
+                "in stable v0.3.0.\n",
+            ),
             ("docs/processing-budgets.md", "Available on the current development branch.\n"),
             ("SECURITY.md", "The development CLI's JSON mode escapes names.\n"),
         )

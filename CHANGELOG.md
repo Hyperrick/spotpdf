@@ -23,6 +23,11 @@ All notable user-visible changes are documented here. The project follows
 - Release validation now rejects repository-relative or stale-tag README links
   that would break on PyPI, and `twine check --strict` validates both built
   distributions' metadata and long description.
+- Every mutating CLI command now accepts `--dry-run` instead of an output path.
+  The mode executes the complete rewrite, serialization, strict reopen, and
+  semantic verification pipeline, then discards the verified temporary PDF.
+  Text identifies the dry run; JSON adds `dry_run: true` and omits `output`
+  without changing normal mutation result shapes.
 
 ### Security
 
@@ -37,6 +42,9 @@ All notable user-visible changes are documented here. The project follows
   only `id-token: write`; it cannot check out or rebuild repository code and
   uses no stored package-index credential.
 - Read-only CI checkouts no longer retain Git credentials beyond checkout.
+- Dry-run success is emitted only after private temporary storage has been
+  cleaned up. Handled mutation failures remove the private output; a filesystem
+  cleanup failure becomes an I/O error before any success record is emitted.
 
 ## [0.6.0] - 2026-08-30
 

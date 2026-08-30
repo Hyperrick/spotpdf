@@ -83,6 +83,19 @@ def smoke_archive(archive: Path) -> None:
         version = run([str(executable), "--version"])
         before = run([str(executable), "list", str(source)])
         before_json = run([str(executable), "--format", "json", "list", str(source)])
+        source_before_dry_run = source.read_bytes()
+        dry_run_json = run(
+            [
+                str(executable),
+                "--format",
+                "json",
+                "remove",
+                str(source),
+                "--spot",
+                "Varnish",
+                "--dry-run",
+            ]
+        )
         check_json = run(
             [str(executable), "check", str(source), "--spot", "Varnish", "--format", "json"],
             expected_exit=2,
@@ -148,6 +161,18 @@ def smoke_archive(archive: Path) -> None:
             raise SystemExit(f"unexpected installed version from {archive.name}")
         if "Varnish" not in before.stdout:
             raise SystemExit(f"demo spot not found with {archive.name}")
+        dry_run_result = json_record(
+            dry_run_json,
+            command="remove",
+            expected_exit=0,
+            success=True,
+        )["result"]
+        if (
+            dry_run_result.get("dry_run") is not True
+            or "output" in dry_run_result
+            or source.read_bytes() != source_before_dry_run
+        ):
+            raise SystemExit(f"installed dry-run contract failed with {archive.name}")
         json_result = json_record(
             before_json,
             command="list",
