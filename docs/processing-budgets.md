@@ -92,11 +92,10 @@ code `1` and identifies both the observed value and the matching option:
 spotpdf: error: processing budget exceeded: pages 10001 > 10000 (raise this limit with --max-pages or ProcessingLimits(max_pages=...) for a trusted large job)
 ```
 
-On the current development branch, `--format json` reports the same failure as
+With `--format json`, the same failure uses
 `error.code: "budget_exceeded"` and provides stable `metric`, `field`,
 `observed`, `limit`, and `option` values in `error.details`. See the
-[JSON output contract](json-output.md). This mode is not included in stable
-v0.5.0.
+[JSON output contract](json-output.md).
 
 No output is published. An existing destination supplied with `--force`
 remains byte-for-byte unchanged, and no private temporary candidate remains.

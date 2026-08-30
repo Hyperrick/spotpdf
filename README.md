@@ -81,19 +81,20 @@ Python 3.11 or newer is required. Install the latest stable release as an
 isolated command with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.5.0
+uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.6.0
 spotpdf --version
 ```
 
 Or use `pipx`:
 
 ```bash
-pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.5.0
+pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.6.0
 ```
 
-Stable v0.5.0 contains `list`, `check`, `remove`, `rename`, `set-alternate`,
+Stable v0.6.0 contains `list`, `check`, `remove`, `rename`, `set-alternate`,
 and the fail-closed `convert` command and library API. It also includes the
-single-pass inventory and configurable processing budgets documented below.
+single-pass inventory, configurable processing budgets, and versioned JSON
+automation contract documented below.
 
 For development, clone the repository and use the locked environment:
 
@@ -122,11 +123,7 @@ Personalization  spot  Separation   1      1          painted
 Varnish          spot  Separation   1      1          painted
 ```
 
-### JSON automation (unreleased)
-
-> [!NOTE]
-> `--format json` and the distinct usage-error exit code `64` are available on
-> the current development branch. They are not included in stable v0.5.0.
+### JSON automation
 
 Every input-processing command can emit exactly one schema-versioned JSON
 object. Text remains the default:
@@ -136,7 +133,7 @@ spotpdf --format json list input.pdf
 ```
 
 ```json
-{"command":"list","exit_code":0,"ok":true,"result":{"colorant_count":1,"colorants":[{"contexts":["painted"],"kinds":["Separation"],"name":"Varnish","pages":[1],"paint_operations":1,"roles":["spot"]}],"input":"input.pdf"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.5.0"}
+{"command":"list","exit_code":0,"ok":true,"result":{"colorant_count":1,"colorants":[{"contexts":["painted"],"kinds":["Separation"],"name":"Varnish","pages":[1],"paint_operations":1,"roles":["spot"]}],"input":"input.pdf"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.6.0"}
 ```
 
 Successful results go to stdout. Runtime errors and parser errors after a valid
@@ -277,7 +274,7 @@ atomic publication guarantee applies to `rename`, `set-alternate`, and
 
 ## Processing budgets
 
-These controls are included in stable v0.5.0.
+These controls are included in stable v0.6.0.
 
 Every input-processing subcommand applies finite per-input ceilings before
 analysis or mutation:
@@ -316,9 +313,8 @@ configuration, and limitations are in the
 
 Because “present” is an intentional `check` result, shell scripts should handle
 exit code `2` explicitly. JSON does not change exit semantics: a present result
-has `ok: true`, `exit_code: 2`, and `result.present: true`. Stable v0.5.0 still
-uses exit `2` for argument errors; the unambiguous exit `64` starts with the
-next release.
+has `ok: true`, `exit_code: 2`, and `result.present: true`. In v0.6.0 and later,
+argument errors use the unambiguous exit code `64`.
 
 The “no output published” guarantee applies to PDF processing failures. If a
 caller closes stdout or stderr while a successful mutation is reporting its

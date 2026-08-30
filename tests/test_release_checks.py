@@ -57,7 +57,22 @@ class ReleaseMetadataTests(unittest.TestCase):
             "pipx install "
             f"git+https://github.com/Hyperrick/spotpdf.git@{readme_tag}\n"
             f"Stable {readme_tag} contains the documented commands.\n"
+            f'{{"spotpdf_version":"{project_version}"}}\n'
             "For development, clone the repository.\n",
+            encoding="utf-8",
+        )
+        docs = self.root / "docs"
+        docs.mkdir(parents=True, exist_ok=True)
+        (docs / "json-output.md").write_text(
+            f'# JSON output\n\n{{"spotpdf_version":"{project_version}"}}\n',
+            encoding="utf-8",
+        )
+        (docs / "processing-budgets.md").write_text(
+            "# Processing budgets\n\nPublished budget contract.\n",
+            encoding="utf-8",
+        )
+        (self.root / "SECURITY.md").write_text(
+            "# Security\n\nPublished security contract.\n",
             encoding="utf-8",
         )
         template = self.root / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
@@ -240,6 +255,40 @@ class ReleaseMetadataTests(unittest.TestCase):
         template.write_text('placeholder: "spotpdf 0.2.1"\n', encoding="utf-8")
         with self.assertRaisesRegex(ReleaseCheckError, "bug-report version placeholder"):
             validate_release_metadata(self.root, "v0.3.0")
+
+    def test_release_documents_reject_development_only_claims(self) -> None:
+        claims = (
+            ("docs/json-output.md", "This requires the next release.\n"),
+            ("docs/processing-budgets.md", "Available on the current development branch.\n"),
+            ("SECURITY.md", "The development CLI's JSON mode escapes names.\n"),
+        )
+        for relative_path, claim in claims:
+            with self.subTest(path=relative_path):
+                self._write_metadata()
+                path = self.root / relative_path
+                path.write_text(path.read_text(encoding="utf-8") + claim, encoding="utf-8")
+                with self.assertRaisesRegex(ReleaseCheckError, "development-only"):
+                    validate_release_metadata(self.root, "v0.3.0")
+
+    def test_release_documents_bind_json_examples_to_package_version(self) -> None:
+        mutations = (
+            lambda text: text.replace(
+                '"spotpdf_version":"0.3.0"',
+                '"spotpdf_version":"0.2.1"',
+            ),
+            lambda text: text + '{"spotpdf_version":"development"}\n',
+        )
+        for relative_path in ("README.md", "docs/json-output.md"):
+            for mutation in mutations:
+                with self.subTest(path=relative_path, mutation=mutation):
+                    self._write_metadata()
+                    path = self.root / relative_path
+                    path.write_text(
+                        mutation(path.read_text(encoding="utf-8")),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(ReleaseCheckError, "spotpdf_version examples"):
+                        validate_release_metadata(self.root, "v0.3.0")
 
     def test_release_notes_are_exactly_the_current_dated_section(self) -> None:
         self.assertEqual(

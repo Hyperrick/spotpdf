@@ -5,6 +5,8 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-30
+
 ### Added
 
 - Schema-versioned JSON output for all six input-processing commands through
@@ -22,6 +24,9 @@ All notable user-visible changes are documented here. The project follows
 
 - Invalid command-line arguments now exit with `64`, leaving exit `2`
   exclusively for a successful `check` result whose requested name is present.
+- Stable-release validation now also rejects stale development-only claims and
+  mismatched `spotpdf_version` examples in the README and normative JSON,
+  processing-budget, and security documentation.
 
 ### Compatibility
 
@@ -212,7 +217,8 @@ First public beta release.
 - Verify saved output before atomic replacement and preserve an existing forced
   destination whenever processing fails.
 
-[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Hyperrick/spotpdf/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Hyperrick/spotpdf/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Hyperrick/spotpdf/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Hyperrick/spotpdf/compare/v0.2.1...v0.3.0
