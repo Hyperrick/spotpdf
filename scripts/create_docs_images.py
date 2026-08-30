@@ -3,12 +3,50 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
+import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+try:
+    from scripts.docs_image_check import (
+        ImageDifference,
+        PngFormatError,
+        RgbImage,
+        compare_rgb_images,
+        crop_rgb_image,
+        read_rgb_png,
+    )
+except ModuleNotFoundError:
+    from docs_image_check import (
+        ImageDifference,
+        PngFormatError,
+        RgbImage,
+        compare_rgb_images,
+        crop_rgb_image,
+        read_rgb_png,
+    )
+
+RASTER_IMAGE_NAMES = ("demo-before.png", "demo-alternate.png", "demo-after.png")
+VECTOR_IMAGE_NAMES = ("demo-rename.svg", "demo-convert.svg")
+GENERATION_METADATA_NAME = "generation.json"
+LARGE_CHANNEL_DELTA = 16
+MAX_LARGE_DELTA_PIXEL_FRACTION = 0.025
+MAX_MEAN_ABSOLUTE_CHANNEL_DELTA = 2.0
+REMOVAL_REGIONS = (
+    ("Varnish", (530, 340, 910, 650)),
+    ("CutContour", (960, 350, 1350, 630)),
+    ("Personalization", (70, 730, 1000, 835)),
+)
+MIN_REMOVAL_LARGE_DELTA_FRACTION = 0.03
+MIN_REMOVAL_MEAN_ABSOLUTE_DELTA = 3.0
+MAX_REMOVAL_REGION_LARGE_DELTA_FRACTION = 0.01
+MAX_REMOVAL_REGION_MEAN_ABSOLUTE_DELTA = 0.75
 
 
 def run(
@@ -21,14 +59,14 @@ def run(
     return subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def create_docs_images(repository: Path) -> None:
+def create_docs_images(repository: Path, *, destination: Path | None = None) -> None:
     """Create synthetic render comparisons and mutation walkthroughs."""
 
     renderer = shutil.which("pdftoppm")
     if renderer is None:
         raise SystemExit("Poppler pdftoppm is required to regenerate documentation images")
 
-    images = repository / "docs" / "images"
+    images = destination or repository / "docs" / "images"
     images.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
@@ -84,6 +122,9 @@ def create_docs_images(repository: Path) -> None:
         if "CutContour\t" not in converted_inventory:
             raise SystemExit("convert documentation output lost an unrelated spot")
         _spotpdf(repository, "remove", str(source), "--all", "-o", str(removed))
+        removed_inventory = _spotpdf(repository, "list", str(removed)).stdout
+        if removed_inventory != "No reachable named colorants found.\n":
+            raise SystemExit("remove-all documentation output still has named colorants")
 
         before_png = _render(renderer, source, root / "before")
         renamed_png = _render(renderer, renamed, root / "renamed")
@@ -96,6 +137,7 @@ def create_docs_images(repository: Path) -> None:
             raise SystemExit("set-alternate documentation render did not change")
         if before_png.read_bytes() != converted_png.read_bytes():
             raise SystemExit("equivalent convert documentation render is not pixel-identical")
+        _verify_removed_regions(before_png, removed_png)
 
         shutil.copyfile(before_png, images / "demo-before.png")
         shutil.copyfile(alternate_png, images / "demo-alternate.png")
@@ -103,11 +145,232 @@ def create_docs_images(repository: Path) -> None:
         (images / "demo-rename.svg").write_text(
             _rename_svg(before, after, rename_result),
             encoding="utf-8",
+            newline="\n",
         )
         (images / "demo-convert.svg").write_text(
             _convert_svg(before, converted_inventory, convert_result),
             encoding="utf-8",
+            newline="\n",
         )
+        _write_generation_metadata(repository, images / GENERATION_METADATA_NAME)
+
+
+def check_docs_images(repository: Path) -> None:
+    """Regenerate visuals privately and reject meaningful committed-image drift."""
+
+    committed = repository / "docs" / "images"
+    _validate_docs_image_set(repository)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        generated = Path(temp_dir) / "images"
+        create_docs_images(repository, destination=generated)
+        for name in VECTOR_IMAGE_NAMES + (GENERATION_METADATA_NAME,):
+            try:
+                if (committed / name).read_bytes() != (generated / name).read_bytes():
+                    raise SystemExit(f"generated documentation file is stale: {name}")
+            except OSError as error:
+                raise SystemExit(f"could not compare documentation file {name}: {error}") from error
+
+        metrics: list[str] = []
+        for name in RASTER_IMAGE_NAMES:
+            try:
+                reference = read_rgb_png(committed / name)
+                candidate = read_rgb_png(generated / name)
+                difference = compare_rgb_images(
+                    reference,
+                    candidate,
+                    large_channel_delta=LARGE_CHANNEL_DELTA,
+                )
+            except PngFormatError as error:
+                raise SystemExit(str(error)) from error
+            if name == "demo-after.png":
+                _verify_committed_removal_regions(reference, candidate)
+            metrics.append(
+                f"{name}: >{LARGE_CHANNEL_DELTA}="
+                f"{difference.large_delta_pixel_fraction:.3%}, "
+                f"mean={difference.mean_absolute_channel_delta:.3f}"
+            )
+            if (
+                difference.large_delta_pixel_fraction > MAX_LARGE_DELTA_PIXEL_FRACTION
+                or difference.mean_absolute_channel_delta > MAX_MEAN_ABSOLUTE_CHANNEL_DELTA
+            ):
+                raise SystemExit(
+                    f"generated documentation PNG is visually stale: {name}; "
+                    f">{LARGE_CHANNEL_DELTA} channel delta on "
+                    f"{difference.large_delta_pixel_fraction:.3%} of pixels "
+                    f"(limit {MAX_LARGE_DELTA_PIXEL_FRACTION:.3%}), mean absolute channel "
+                    f"delta {difference.mean_absolute_channel_delta:.3f} "
+                    f"(limit {MAX_MEAN_ABSOLUTE_CHANNEL_DELTA:.3f})"
+                )
+    print("Documentation images are current; " + "; ".join(metrics))
+
+
+def _validate_docs_image_set(repository: Path) -> None:
+    """Require exactly the generated image files to be tracked by Git."""
+
+    expected_names = set(RASTER_IMAGE_NAMES + VECTOR_IMAGE_NAMES + (GENERATION_METADATA_NAME,))
+    actual_names = _tracked_docs_image_names(repository)
+    if actual_names != expected_names:
+        missing = sorted(expected_names - actual_names)
+        unexpected = sorted(actual_names - expected_names)
+        raise SystemExit(
+            "documentation image set does not match the generator; "
+            f"missing={missing!r}, unexpected={unexpected!r}"
+        )
+    untracked_names = _git_docs_image_names(
+        repository,
+        "--others",
+        "--exclude-standard",
+        description="non-ignored untracked documentation images",
+    )
+    if untracked_names:
+        raise SystemExit(
+            "documentation image directory contains non-ignored untracked files: "
+            f"{sorted(untracked_names)!r}"
+        )
+
+
+def _tracked_docs_image_names(repository: Path) -> set[str]:
+    """Return tracked paths below docs/images, relative to that directory."""
+
+    return _git_docs_image_names(repository, description="tracked documentation images")
+
+
+def _git_docs_image_names(
+    repository: Path,
+    *options: str,
+    description: str,
+) -> set[str]:
+    """Return selected Git paths below docs/images, relative to that directory."""
+
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                os.fspath(repository),
+                "ls-files",
+                *options,
+                "-z",
+                "--",
+                "docs/images",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = getattr(error, "stderr", b"")
+        if isinstance(detail, bytes):
+            detail = detail.decode(errors="replace")
+        raise SystemExit(f"could not list {description}: {detail or error}") from error
+
+    prefix = PurePosixPath("docs/images")
+    names: set[str] = set()
+    for raw_path in completed.stdout.split(b"\0"):
+        if not raw_path:
+            continue
+        path = PurePosixPath(os.fsdecode(raw_path))
+        try:
+            relative = path.relative_to(prefix)
+        except ValueError as error:
+            raise SystemExit(
+                f"Git returned an unexpected documentation image path: {path}"
+            ) from error
+        names.add(relative.as_posix())
+    return names
+
+
+def _verify_removed_regions(before: Path, removed: Path) -> None:
+    """Require a localized visual change for every removed demo spot plate."""
+
+    try:
+        before_image = read_rgb_png(before)
+        removed_image = read_rgb_png(removed)
+        for spot_name, region in REMOVAL_REGIONS:
+            difference = _compare_region(before_image, removed_image, region)
+            if (
+                difference.large_delta_pixel_fraction < MIN_REMOVAL_LARGE_DELTA_FRACTION
+                or difference.mean_absolute_channel_delta < MIN_REMOVAL_MEAN_ABSOLUTE_DELTA
+            ):
+                raise SystemExit(
+                    f"remove-all documentation render retained localized {spot_name} artwork"
+                )
+    except PngFormatError as error:
+        raise SystemExit(str(error)) from error
+
+
+def _verify_committed_removal_regions(reference: RgbImage, candidate: RgbImage) -> None:
+    """Reject a committed removal screenshot with stale localized artwork."""
+
+    for spot_name, region in REMOVAL_REGIONS:
+        difference = _compare_region(reference, candidate, region)
+        if (
+            difference.large_delta_pixel_fraction > MAX_REMOVAL_REGION_LARGE_DELTA_FRACTION
+            or difference.mean_absolute_channel_delta > MAX_REMOVAL_REGION_MEAN_ABSOLUTE_DELTA
+        ):
+            raise SystemExit(
+                "generated documentation PNG is visually stale in the "
+                f"{spot_name} removal region; >{LARGE_CHANNEL_DELTA} channel delta on "
+                f"{difference.large_delta_pixel_fraction:.3%} of pixels "
+                f"(limit {MAX_REMOVAL_REGION_LARGE_DELTA_FRACTION:.3%}), mean absolute "
+                f"channel delta {difference.mean_absolute_channel_delta:.3f} "
+                f"(limit {MAX_REMOVAL_REGION_MEAN_ABSOLUTE_DELTA:.3f})"
+            )
+
+
+def _compare_region(
+    reference: RgbImage,
+    candidate: RgbImage,
+    region: tuple[int, int, int, int],
+) -> ImageDifference:
+    left, top, right, bottom = region
+    return compare_rgb_images(
+        crop_rgb_image(
+            reference,
+            left=left,
+            top=top,
+            right=right,
+            bottom=bottom,
+        ),
+        crop_rgb_image(
+            candidate,
+            left=left,
+            top=top,
+            right=right,
+            bottom=bottom,
+        ),
+        large_channel_delta=LARGE_CHANNEL_DELTA,
+    )
+
+
+def _write_generation_metadata(repository: Path, destination: Path) -> None:
+    inputs = [
+        repository / "examples" / "create_demo_pdf.py",
+        repository / "pyproject.toml",
+        repository / "scripts" / "create_docs_images.py",
+        repository / "scripts" / "docs_image_check.py",
+        repository / "uv.lock",
+        *sorted((repository / "src" / "spotpdf").rglob("*.py")),
+    ]
+    try:
+        digests = {
+            path.relative_to(repository).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in inputs
+        }
+    except OSError as error:
+        raise SystemExit(f"could not fingerprint documentation image inputs: {error}") from error
+    destination.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "sha256_inputs": digests,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
 
 
 def _spotpdf(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -290,8 +553,17 @@ def main() -> None:
         default=Path(__file__).resolve().parents[1],
         help="spotpdf repository root",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="regenerate privately and compare with the committed visuals",
+    )
     args = parser.parse_args()
-    create_docs_images(args.repository.resolve())
+    repository = args.repository.resolve()
+    if args.check:
+        check_docs_images(repository)
+    else:
+        create_docs_images(repository)
 
 
 if __name__ == "__main__":

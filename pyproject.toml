@@ -40,7 +40,7 @@ spotpdf = "spotpdf.cli:main"
 where = ["src"]
 
 [dependency-groups]
-dev = ["ruff>=0.12,<1", "setuptools==84.0.0"]
+dev = ["markdown-it-py>=4.2,<5", "ruff>=0.12,<1", "setuptools==84.0.0"]
 
 [tool.ruff]
 line-length = 100

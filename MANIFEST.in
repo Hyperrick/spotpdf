@@ -3,7 +3,19 @@ include CONTRIBUTING.md
 include LICENSE
 include README.md
 include SECURITY.md
-recursive-include docs *.md *.png *.svg
+include docs/architecture.md
+include docs/compatibility.md
+include docs/json-output.md
+include docs/performance.md
+include docs/processing-budgets.md
+include docs/public-corpus.md
+include docs/releasing.md
+include docs/images/demo-after.png
+include docs/images/demo-alternate.png
+include docs/images/demo-before.png
+include docs/images/demo-convert.svg
+include docs/images/demo-rename.svg
+include docs/images/generation.json
 recursive-include corpus *.toml
 recursive-include examples *.py
 recursive-include scripts *.py

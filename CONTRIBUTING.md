@@ -33,6 +33,9 @@ uv lock --check
 uv run ruff check .
 uv run ruff format --check .
 uv run python scripts/check_python_size.py
+uv run python scripts/check_repository.py
+uv run python scripts/create_docs_images.py
+uv run python scripts/create_docs_images.py --check
 uv run python -m unittest discover -s tests -v
 uv run python scripts/benchmark_inventory.py --runs 3
 artifact_dir="$(mktemp -d)"
@@ -53,6 +56,15 @@ attribution, licenses, and offline reproduction.
 The inventory benchmark creates 64- and 128-spot PDFs only in a temporary
 directory. Its page/Form parse counts are deterministic; timing and Python heap
 measurements are diagnostic. See [docs/performance.md](docs/performance.md).
+
+Documentation image checks regenerate all five synthetic visuals in a private
+temporary directory. A deterministic SHA-256 manifest binds them to the demo,
+locked environment, generator, and current spotpdf source. SVGs and that
+manifest must match byte for byte. PNGs use bounded decoding and calibrated
+pixel-drift limits so harmless Poppler antialiasing differences between
+operating systems pass while meaningful visual changes fail: at most 2.5% of
+pixels may have an RGB channel delta above 16, and the mean absolute channel
+delta may not exceed 2.0.
 
 ## Processing budget changes
 
@@ -103,7 +115,12 @@ case over vendoring it. Document all of the following in the pull request:
 - why a synthetic fixture cannot exercise the same behavior.
 
 Do not add customer files, real print jobs, or PDFs with personal information.
-The repository and distribution checks reject all `*.pdf` files by default.
+The repository and distribution checks reject all tracked `*.pdf` files by
+default, including mixed-case extensions. Repository-relative Markdown
+destinations and repository-relative targets in HTML `href`, `src`, and
+`srcset` attributes may only point to tracked files; ignored local files are
+deliberately not accepted. External URLs and URL fragments are outside this
+check's scope, but the file path before a fragment is still validated.
 
 ## Design rules
 
