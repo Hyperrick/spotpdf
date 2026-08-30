@@ -12,13 +12,16 @@ GitHub assets.
    project version in `uv.lock` matches.
 3. Move the release notes from `Unreleased` to a dated `X.Y.Z` section and
    update the comparison links.
-4. Update both stable install commands in `README.md` to `@vX.Y.Z`.
+4. Update both stable install commands and every stable-version statement in
+   `README.md` to `vX.Y.Z`, remove obsolete development-only release claims,
+   and update the bug-report version placeholder.
 5. Regenerate the synthetic visuals and run every local gate:
 
    ```bash
    uv sync --locked --dev
    uv lock --check
    uv run python scripts/check_release.py metadata --tag vX.Y.Z
+   uv run python scripts/check_release.py notes --version X.Y.Z
    uv run python scripts/create_docs_images.py
    git diff --check
    uv run ruff check .
@@ -45,10 +48,14 @@ GitHub assets.
    git tag -a vX.Y.Z -m "spotpdf X.Y.Z"
    git push origin vX.Y.Z
    ```
+8. Wait for the tag workflow, download the three immutable release assets,
+   verify their checksums and attestations, and confirm the new Changelog
+   comparison links resolve after the tag exists.
 
 Do not create the tag before the release commit is in `main`. The workflow
-checks tag syntax, version agreement, changelog date, README install links,
-lockfile agreement, and whether the tagged commit is contained in `main`.
+checks tag syntax, version agreement, changelog date and notes, README install
+links and stable-release prose, the bug-report placeholder, lockfile agreement,
+and whether the tagged commit is contained in `main`.
 
 ## Automated gates
 
@@ -63,8 +70,10 @@ For a `v*` tag, `.github/workflows/ci.yml`:
 4. builds with the exactly locked setuptools backend;
 5. inspects and installs both the wheel and source archive;
 6. permits exactly one wheel, one source archive, and `SHA256SUMS`;
-7. attests both distributions with GitHub artifact provenance; and
-8. creates the GitHub Release using a job whose only write permission is
+7. attests both distributions with GitHub artifact provenance;
+8. extracts the curated notes from the tagged version's dated Changelog
+   section; and
+9. creates the GitHub Release using a job whose only write permission is
    `contents: write`.
 
 Release-tag runs are never cancelled by the workflow concurrency setting. Each
