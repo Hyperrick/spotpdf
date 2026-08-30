@@ -81,20 +81,19 @@ Python 3.11 or newer is required. Install the latest stable release as an
 isolated command with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.4.0
+uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.5.0
 spotpdf --version
 ```
 
 Or use `pipx`:
 
 ```bash
-pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.4.0
+pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.5.0
 ```
 
-Stable v0.4.0 contains `list`, `check`, `remove`, `rename`, and
-`set-alternate`, including the single-pass inventory used by `list`. The
-current development branch additionally contains the fail-closed `convert`
-command and library API documented below.
+Stable v0.5.0 contains `list`, `check`, `remove`, `rename`, `set-alternate`,
+and the fail-closed `convert` command and library API. It also includes the
+single-pass inventory and configurable processing budgets documented below.
 
 For development, clone the repository and use the locked environment:
 
@@ -255,8 +254,7 @@ atomic publication guarantee applies to `rename`, `set-alternate`, and
 
 ## Processing budgets
 
-These controls are available on the current development branch and are not
-included in the stable v0.4.0 release.
+These controls are included in stable v0.5.0.
 
 Every input-processing subcommand applies finite per-input ceilings before
 analysis or mutation:

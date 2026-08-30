@@ -5,6 +5,17 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-30
+
+spotpdf 0.5.0 adds fail-closed conversion of one supported named
+`/Separation` to explicit DeviceCMYK vector or text paint. The operator supplies
+the CMYK recipe; spotpdf never guesses it from the existing alternate preview.
+
+```console
+spotpdf convert input.pdf --spot "Varnish" \
+  --to-cmyk 0,80,100,0 -o output.pdf
+```
+
 ### Added
 
 - `convert` CLI command and `convert_spot_to_cmyk` library API for replacing a
@@ -44,9 +55,9 @@ All notable user-visible changes are documented here. The project follows
   resource contexts authorize Form writes; external StructTree MCR `/Stm`
   associations and private lookalike structures fail closed.
 - Every input-processing subcommand now performs one fixed-order source budget
-  preflight before analysis or mutation. Any overrun publishes no output and preserves an
-  existing `--force` destination; no created private temporary candidate
-  remains.
+  preflight before analysis or mutation. Any overrun publishes no output,
+  preserves an existing `--force` destination, and leaves no created private
+  temporary candidate behind.
 - Reachable graph entries and content operators are counted incrementally rather
   than materializing complete graph-edge or instruction lists solely for the
   budget check. Application ceilings remain separate from qpdf safeguards and
@@ -175,7 +186,8 @@ First public beta release.
 - Verify saved output before atomic replacement and preserve an existing forced
   destination whenever processing fails.
 
-[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Hyperrick/spotpdf/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Hyperrick/spotpdf/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Hyperrick/spotpdf/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Hyperrick/spotpdf/releases/tag/v0.2.1
