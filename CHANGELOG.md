@@ -40,6 +40,10 @@ All notable user-visible changes are documented here. The project follows
 - An actionable troubleshooting guide maps common fail-closed errors to causes
   and safe next steps without treating `--force`, higher budgets, or PDF-object
   patching as ways to bypass unsupported semantics and document restrictions.
+- The seven supported Python operations, their core result records, limits,
+  colorant roles/kinds, and controlled errors now have one canonical package-root
+  import surface. All path arguments consistently accept strings and path-like
+  objects, and built distributions declare and verify PEP 561 inline typing.
 
 ### Security
 

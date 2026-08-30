@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from os import PathLike
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -39,8 +40,8 @@ _DocumentFingerprint: TypeAlias = tuple[Any, ...]
 
 
 def rename_spot(
-    input_path: Path,
-    output_path: Path,
+    input_path: str | PathLike[str],
+    output_path: str | PathLike[str],
     source: str,
     destination: str,
     *,
@@ -49,6 +50,8 @@ def rename_spot(
 ) -> RenameResult:
     """Rename one exact Separation plate and all supported name dependencies."""
 
+    input_path = Path(input_path)
+    output_path = Path(output_path)
     limits = require_processing_limits(limits)
     result: RenameResult | None = None
     with atomic_pdf_output(input_path, output_path, force=force, limits=limits) as output:

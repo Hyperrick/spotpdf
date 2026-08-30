@@ -111,8 +111,7 @@ argument is omitted.
 ```python
 from pathlib import Path
 
-from spotpdf import ProcessingLimits
-from spotpdf.document import inspect_pdf
+from spotpdf import ProcessingLimits, inspect_pdf
 
 limits = ProcessingLimits(
     max_input_bytes=1_073_741_824,
@@ -125,7 +124,7 @@ Catch `ProcessingBudgetExceeded` when a caller needs structured handling. It
 exposes stable `metric`, `field`, `observed`, `limit`, and `option` attributes:
 
 ```python
-from spotpdf import ProcessingBudgetExceeded
+from spotpdf import ProcessingBudgetExceeded, inspect_pdf
 
 try:
     report = inspect_pdf(Path("input.pdf"), limits=limits)
@@ -136,7 +135,9 @@ except ProcessingBudgetExceeded as error:
 Library callers may set an individual field to `None` to disable that one
 application limit. CLI users must always supply a positive value. Disabling or
 raising an application ceiling does not alter PDF compatibility checks and does
-not relax qpdf or operating-system controls.
+not relax qpdf or operating-system controls. See the complete
+[Python API](python-api.md) for canonical imports, results, and controlled
+exceptions.
 
 ## What these budgets cannot guarantee
 

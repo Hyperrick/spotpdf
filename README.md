@@ -228,10 +228,15 @@ See [PDF compatibility](https://github.com/Hyperrick/spotpdf/blob/v0.6.0/docs/co
 
 The same operation is available as a library API:
 
+> [!NOTE]
+> The canonical package-root import below is available on `main` and first ships
+> in v0.7.0; it is not present in the currently installed v0.6.0 release. With
+> v0.6.0, use `from spotpdf.convert import convert_spot_to_cmyk` instead.
+
 ```python
 from pathlib import Path
 
-from spotpdf.convert import convert_spot_to_cmyk
+from spotpdf import convert_spot_to_cmyk
 
 result = convert_spot_to_cmyk(
     Path("input.pdf"),
@@ -241,6 +246,11 @@ result = convert_spot_to_cmyk(
 )
 print(result.page_content_sequences_changed, result.pages_affected)
 ```
+
+See the
+[Python API guide](https://github.com/Hyperrick/spotpdf/blob/main/docs/python-api.md)
+for the canonical root imports, typed result records, controlled error
+hierarchy, and compatibility policy.
 
 Remove supported paint for one name:
 
@@ -486,6 +496,7 @@ guarantees.
 - [Contributing](https://github.com/Hyperrick/spotpdf/blob/main/CONTRIBUTING.md)
 - [JSON output and automation](https://github.com/Hyperrick/spotpdf/blob/v0.6.0/docs/json-output.md)
 - [Processing budgets](https://github.com/Hyperrick/spotpdf/blob/v0.6.0/docs/processing-budgets.md)
+- [Python API](https://github.com/Hyperrick/spotpdf/blob/main/docs/python-api.md)
 - [Public corpus and RIP checks](https://github.com/Hyperrick/spotpdf/blob/v0.6.0/docs/public-corpus.md)
 - [Release process and artifact verification](https://github.com/Hyperrick/spotpdf/blob/main/docs/releasing.md)
 - [Security policy](https://github.com/Hyperrick/spotpdf/security/policy)
