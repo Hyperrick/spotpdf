@@ -458,6 +458,10 @@ uv run python scripts/check_distribution.py "$artifact_dir"
 uv run python scripts/smoke_distributions.py "$artifact_dir"
 ```
 
+The distribution check rejects private fixture material and also requires the
+canonical Support and Security project links in both the wheel and source
+archive metadata.
+
 All PDF test fixtures are generated at runtime. Do not add confidential,
 customer, or production PDFs. Contribution and fixture rules are in
 [CONTRIBUTING.md](https://github.com/Hyperrick/spotpdf/blob/main/CONTRIBUTING.md). Releases additionally run the pinned

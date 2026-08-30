@@ -51,6 +51,9 @@ uv run python scripts/check_distribution.py "$artifact_dir"
 uv run python scripts/smoke_distributions.py "$artifact_dir"
 ```
 
+The distribution check validates both archive contents and the canonical
+Support and Security links embedded in each archive's Core Metadata.
+
 Maintainers should also run the hash-pinned public corpus before a release:
 
 ```bash

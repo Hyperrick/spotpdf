@@ -110,6 +110,10 @@ class ReleaseWorkflowPolicyTests(unittest.TestCase):
         self.assertIn("readme-renderer[md]>=46,<47", release)
         self.assertIn("twine>=7,<8", release)
 
+    def test_package_checks_distribution_contents_and_project_urls(self) -> None:
+        step = self._step("package", "Inspect distribution contents and project URLs")
+        self.assertIn("uv run python scripts/check_distribution.py dist", step)
+
 
 if __name__ == "__main__":
     unittest.main()
