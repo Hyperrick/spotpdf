@@ -18,6 +18,18 @@ All notable user-visible changes are documented here. The project follows
   questions, reproducible bugs, feature requests, and private vulnerability
   reports while keeping confidential PDFs and sensitive output data out of
   project channels.
+- A tokenless PyPI Trusted Publishing path uploads the already tested wheel and
+  source archive only after the corresponding GitHub Release is immutable.
+- Release validation now rejects repository-relative or stale-tag README links
+  that would break on PyPI, and `twine check --strict` validates both built
+  distributions' metadata and long description.
+
+### Security
+
+- The PyPI publisher is isolated in a two-step, tag-only environment job with
+  only `id-token: write`; it cannot check out or rebuild repository code and
+  uses no stored package-index credential.
+- Read-only CI checkouts no longer retain Git credentials beyond checkout.
 
 ## [0.6.0] - 2026-08-30
 

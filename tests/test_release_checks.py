@@ -52,10 +52,12 @@ class ReleaseMetadataTests(unittest.TestCase):
             encoding="utf-8",
         )
         (self.root / "README.md").write_text(
+            "```bash\n"
             "uv tool install "
             f"git+https://github.com/Hyperrick/spotpdf.git@{readme_tag}\n"
             "pipx install "
             f"git+https://github.com/Hyperrick/spotpdf.git@{readme_tag}\n"
+            "```\n"
             f"Stable {readme_tag} contains the documented commands.\n"
             f'{{"spotpdf_version":"{project_version}"}}\n'
             "For development, clone the repository.\n",
@@ -148,7 +150,8 @@ class ReleaseMetadataTests(unittest.TestCase):
         readme = self.root / "README.md"
         readme.write_text(
             readme.read_text(encoding="utf-8")
-            + "uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.2.1\n",
+            + "```bash\nuv tool install "
+            + "git+https://github.com/Hyperrick/spotpdf.git@v0.2.1\n```\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ReleaseCheckError, "does not uniquely use"):
