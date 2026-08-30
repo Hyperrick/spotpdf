@@ -32,17 +32,26 @@ Before submitting a pull request, run:
 uv run ruff check .
 uv run ruff format --check .
 uv run python -m unittest discover -s tests -v
-uv build
+uv build --no-build-isolation
 uv run python scripts/check_distribution.py dist
 ```
+
+Maintainers should also run the hash-pinned public corpus before a release:
+
+```bash
+uv run python scripts/check_public_corpus.py
+```
+
+See [docs/public-corpus.md](docs/public-corpus.md) for system dependencies,
+attribution, licenses, and offline reproduction.
 
 ## PDF fixtures
 
 Tests should build the smallest possible PDF with `pikepdf` inside a temporary
 directory. Generated fixtures must not survive the test run.
 
-If a third-party fixture is essential, document all of the following in the
-pull request before adding it:
+If a third-party fixture is essential, prefer a commit-pinned external corpus
+case over vendoring it. Document all of the following in the pull request:
 
 - canonical source URL;
 - author or project;

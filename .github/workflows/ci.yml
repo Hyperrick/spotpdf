@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 env:
   UV_VERSION: "0.11.24"
@@ -77,14 +77,18 @@ jobs:
       - name: Run tests
         run: uv run python -m unittest discover -s tests -v
 
-  package:
-    name: Package
-    needs: [quality, test]
+  public_corpus:
+    name: Public corpus
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install uv and Python
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
@@ -93,9 +97,162 @@ jobs:
           enable-cache: true
       - name: Sync locked development environment
         run: uv sync --locked --dev
+      - name: Install PDF validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ghostscript poppler-utils qpdf
+      - name: Validate pinned public PDF corpus
+        run: uv run python scripts/check_public_corpus.py
+
+  package:
+    name: Package
+    needs: [quality, test, public_corpus]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      release_version: ${{ steps.release_metadata.outputs.version }}
+    steps:
+      - name: Require successful prerequisite jobs
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          PUBLIC_CORPUS_RESULT: ${{ needs.public_corpus.result }}
+          IS_RELEASE_TAG: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
+        run: |
+          if [[ "$QUALITY_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
+            echo "Quality and test jobs must pass before packaging." >&2
+            exit 1
+          fi
+          expected_corpus_result="skipped"
+          if [[ "$IS_RELEASE_TAG" == "true" ]]; then
+            expected_corpus_result="success"
+          fi
+          if [[ "$PUBLIC_CORPUS_RESULT" != "$expected_corpus_result" ]]; then
+            echo "Unexpected public corpus result: $PUBLIC_CORPUS_RESULT" >&2
+            exit 1
+          fi
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync locked development environment
+        run: uv sync --locked --dev
+      - name: Validate release metadata and tag ancestry
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        id: release_metadata
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "Release tag must point to a commit contained in main." >&2
+            exit 1
+          }
+          version="$(uv run python scripts/check_release.py metadata --tag "$RELEASE_TAG")"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
       - name: Build wheel and source archive
-        run: uv build
+        run: uv build --no-build-isolation
       - name: Inspect distribution contents
         run: uv run python scripts/check_distribution.py dist
       - name: Install and exercise both distributions
         run: uv run python scripts/smoke_distributions.py dist
+      - name: Prepare release assets
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        env:
+          RELEASE_VERSION: ${{ steps.release_metadata.outputs.version }}
+        run: >-
+          uv run python scripts/check_release.py prepare-assets
+          --version "$RELEASE_VERSION" --dist dist
+      - name: Upload verified release assets
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: spotpdf-release-${{ github.ref_name }}
+          path: |
+            dist/spotpdf-${{ steps.release_metadata.outputs.version }}-py3-none-any.whl
+            dist/spotpdf-${{ steps.release_metadata.outputs.version }}.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  attest_release:
+    name: Attest release provenance
+    needs: package
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download verified release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: spotpdf-release-${{ github.ref_name }}
+          path: dist
+      - name: Verify release checksums
+        env:
+          RELEASE_VERSION: ${{ needs.package.outputs.release_version }}
+        run: >-
+          python3 scripts/check_release.py verify-assets
+          --version "$RELEASE_VERSION" --dist dist
+      - name: Attest release distributions
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+
+  release:
+    name: Publish GitHub release
+    needs: [package, attest_release]
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download attested release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: spotpdf-release-${{ github.ref_name }}
+          path: dist
+      - name: Verify release checksums
+        env:
+          RELEASE_VERSION: ${{ needs.package.outputs.release_version }}
+        run: >-
+          python3 scripts/check_release.py verify-assets
+          --version "$RELEASE_VERSION" --dist dist
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.package.outputs.release_version }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "dist/spotpdf-${RELEASE_VERSION}-py3-none-any.whl" \
+            "dist/spotpdf-${RELEASE_VERSION}.tar.gz" \
+            "dist/SHA256SUMS" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --fail-on-no-commits \
+            --title "spotpdf ${RELEASE_VERSION}" \
+            --generate-notes

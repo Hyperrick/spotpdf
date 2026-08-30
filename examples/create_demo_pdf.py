@@ -69,7 +69,7 @@ def _content_stream() -> bytes:
             12,
             48,
             347,
-            "Remove named spot-color objects. Keep the PDF as vector artwork.",
+            "Inspect, rename, and remove PDF spot colors without rasterizing.",
             gray=0.78,
         ),
         # Three process-color cards.

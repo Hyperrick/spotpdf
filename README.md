@@ -34,28 +34,28 @@ production files are included in this repository.
   </tbody>
 </table>
 
+### Rename without changing the artwork
+
+`rename` changes the plate alias, not its color recipe or paint values. The
+same synthetic demo is rendered before and after this command; the two PNGs
+must be pixel-identical.
+
+<a href="docs/images/demo-rename.svg"><img src="docs/images/demo-rename.svg" alt="Terminal walkthrough showing Varnish renamed to Varnish Renamed while all other spot plates stay unchanged and the render remains pixel-identical"></a>
+
 ## Install
 
 Python 3.11 or newer is required. Install the latest stable release as an
 isolated command with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.2.1
+uv tool install git+https://github.com/Hyperrick/spotpdf.git@v0.3.0
 spotpdf --version
 ```
 
 Or use `pipx`:
 
 ```bash
-pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.2.1
-```
-
-Stable `v0.2.1` contains `list`, `check`, and `remove`. The `rename` command
-documented below is currently unreleased; install the current `main` branch to
-try it before the next tagged release:
-
-```bash
-uv tool install --force git+https://github.com/Hyperrick/spotpdf.git@main
+pipx install git+https://github.com/Hyperrick/spotpdf.git@v0.3.0
 ```
 
 For development, clone the repository and use the locked environment:
@@ -195,7 +195,15 @@ The tool never edits an input file in place.
 
 ## Reproduce the demo
 
-Generate both PDFs entirely from code and run the same operation shown above:
+Regenerate all three documentation images from the current CLI and a fresh
+synthetic PDF:
+
+```bash
+uv run python scripts/create_docs_images.py
+```
+
+The script verifies that the rename render is pixel-identical before replacing
+the checked-in images. To inspect the removal steps manually:
 
 ```bash
 mkdir -p tmp/pdfs/demo
@@ -238,13 +246,15 @@ uv sync --locked --dev
 uv run ruff check .
 uv run ruff format --check .
 uv run python -m unittest discover -s tests -v
-uv build
+uv build --no-build-isolation
 uv run python scripts/check_distribution.py dist
 ```
 
 All PDF test fixtures are generated at runtime. Do not add confidential,
 customer, or production PDFs. Contribution and fixture rules are in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). Releases additionally run the pinned
+[public prepress corpus](docs/public-corpus.md) through qpdf, Poppler, and
+Ghostscript `tiffsep`.
 
 ## Roadmap
 
@@ -263,5 +273,7 @@ semantics from `rename` and will not be hidden behind one ambiguous command.
 
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
+- [Public corpus and RIP checks](docs/public-corpus.md)
+- [Release process and artifact verification](docs/releasing.md)
 - [Security policy](SECURITY.md)
 - [MIT License](LICENSE)

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=77.0.3"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "spotpdf"
-version = "0.2.1"
+version = "0.3.0"
 description = "Inspect, rename, and remove named spot colors in vector PDF content."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -40,7 +40,7 @@ spotpdf = "spotpdf.cli:main"
 where = ["src"]
 
 [dependency-groups]
-dev = ["ruff>=0.12,<1"]
+dev = ["ruff>=0.12,<1", "setuptools==84.0.0"]
 
 [tool.ruff]
 line-length = 100

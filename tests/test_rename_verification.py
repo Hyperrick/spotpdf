@@ -9,6 +9,8 @@ from unittest import mock
 import pikepdf
 
 import spotpdf.rename as rename_module
+from spotpdf.document import inspect_pdf
+from spotpdf.metadata_fingerprint import xml_metadata_fingerprint
 from spotpdf.model import SpotPdfError
 from spotpdf.rename import rename_spot
 
@@ -208,6 +210,55 @@ class RenamePostSaveVerificationTests(unittest.TestCase):
             image = pdf.pages[0].Resources.XObject.Photo
             self.assertEqual(image.get(pikepdf.Name.Filter), pikepdf.Name.DCTDecode)
             self.assertEqual(image.read_raw_bytes(), image_data)
+
+    def test_xmp_packet_reserialization_does_not_block_rename(self) -> None:
+        source = self.root / "xmp-reserialization-input.pdf"
+        output = self.root / "xmp-reserialization-output.pdf"
+        xmp = (
+            b'<?xpacket begin="\xef\xbb\xbf" id="W5M0MpCehiHzreSzNTczkc9d"?>\n'
+            b'<x:xmpmeta xmlns:x="adobe:ns:meta/">\n'
+            b'  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n'
+            b'    <rdf:Description rdf:about="" title="Preserve me"/>\n'
+            b"  </rdf:RDF>\n"
+            b"</x:xmpmeta>\n"
+            b'<?xpacket end="w"?>'
+        )
+        with pikepdf.Pdf.new() as pdf:
+            page = pdf.add_blank_page(page_size=(100, 100))
+            page.Resources = pikepdf.Dictionary(
+                ColorSpace=pikepdf.Dictionary(Target=self._separation("Old", 0.3))
+            )
+            page.Contents = pdf.make_stream(b"")
+            metadata = pdf.make_stream(xmp)
+            metadata.Type = pikepdf.Name.Metadata
+            metadata.Subtype = pikepdf.Name.XML
+            pdf.Root.Metadata = metadata
+            pdf.save(source, compress_streams=False)
+
+        source_bytes = source.read_bytes()
+        double_begin = b'<?xpacket begin="\xef\xbb\xbf" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+        single_begin = b"<?xpacket begin='\xef\xbb\xbf' id='W5M0MpCehiHzreSzNTczkc9d'?>"
+        double_end = b'<?xpacket end="w"?>'
+        single_end = b"<?xpacket end='w'?>"
+        self.assertIn(double_begin, source_bytes)
+        self.assertIn(double_end, source_bytes)
+        source.write_bytes(
+            source_bytes.replace(double_begin, single_begin).replace(double_end, single_end)
+        )
+        with pikepdf.open(source) as pdf:
+            before_metadata = pdf.Root.Metadata.read_bytes()
+
+        rename_spot(source, output, "Old", "New")
+
+        self.assertNotIn("Old", inspect_pdf(output).colorants)
+        with pikepdf.open(output) as pdf:
+            after_metadata = pdf.Root.Metadata.read_bytes()
+            self.assertEqual(str(pdf.pages[0].Resources.ColorSpace.Target[1]), "/New")
+        self.assertNotEqual(before_metadata, after_metadata)
+        self.assertEqual(
+            xml_metadata_fingerprint(before_metadata),
+            xml_metadata_fingerprint(after_metadata),
+        )
 
     @classmethod
     def _separation(cls, name: str, magenta: float) -> pikepdf.Array:

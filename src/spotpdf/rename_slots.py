@@ -12,6 +12,7 @@ from typing import Any
 import pikepdf
 
 from .inventory_values import name_or_string, path_name
+from .metadata_fingerprint import xml_metadata_fingerprint
 from .model import InvalidPdfError, NameDependencyKind, SpotPdfError
 from .objects import ObjectKey, object_key
 
@@ -320,13 +321,18 @@ def _semantic_value(
         except pikepdf.PdfError:
             stream_data = value.read_raw_bytes()
             stream_mode = "raw"
+        content_fingerprint: bytes | tuple[Any, ...] = hashlib.sha256(stream_data).digest()
+        if stream_mode == "decoded" and _is_xml_metadata(value):
+            xml_fingerprint = xml_metadata_fingerprint(stream_data)
+            if xml_fingerprint is not None:
+                stream_mode = "metadata-xml"
+                content_fingerprint = xml_fingerprint
         entries = _semantic_dictionary_entries(
             value,
             references,
             stream_mode=stream_mode,
         )
-        digest = hashlib.sha256(stream_data).digest()
-        return ("stream", stream_mode, entries, digest)
+        return ("stream", stream_mode, entries, content_fingerprint)
     if isinstance(value, pikepdf.Dictionary):
         return (
             "dictionary",
@@ -354,7 +360,7 @@ def _semantic_dictionary_entries(
         pikepdf.Name.Length,
         pikepdf.Name.DL,
     }
-    if stream_mode == "decoded":
+    if stream_mode in {"decoded", "metadata-xml"}:
         storage_keys.update((pikepdf.Name.Filter, pikepdf.Name.DecodeParms))
     entries = [
         (str(key), item)
@@ -363,6 +369,13 @@ def _semantic_dictionary_entries(
     ]
     entries.sort(key=lambda item: item[0])
     return tuple((key, _semantic_value(item, references)) for key, item in entries)
+
+
+def _is_xml_metadata(value: pikepdf.Stream) -> bool:
+    return (
+        value.get(pikepdf.Name.Type, None) == pikepdf.Name.Metadata
+        and value.get(pikepdf.Name.Subtype, None) == pikepdf.Name.XML
+    )
 
 
 def normalize_rename_location(location: str, name: str) -> str:

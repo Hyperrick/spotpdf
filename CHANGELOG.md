@@ -5,6 +5,8 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-30
+
 ### Added
 
 - Atomic `rename` command for exact, case-sensitive spot-plate aliasing without
@@ -20,6 +22,19 @@ All notable user-visible changes are documented here. The project follows
 - Exact-name dependency inventory for NChannel process/colorant/mixing-hint
   entries, page `/SeparationInfo`, printer-mark colorants, and TrapNet
   `/SeparationColorNames`.
+- A pinned six-file public prepress release corpus spanning painted
+  Separations, DeviceCMYK and DeviceRGB alternates, DeviceN dependencies,
+  arbitrary NChannel process components, and multi-page definitions.
+- Reproducible synthetic removal and rename documentation images.
+- Automated GitHub release assets, SHA-256 checksums, and build-provenance
+  attestations after the full test and public-corpus gates pass.
+
+### Fixed
+
+- Rename now accepts pikepdf's storage-only XMP packet reserialization in valid
+  PDF/A files while still rejecting RDF values, namespaces, comments, packet
+  identity/mutability, malformed wrapper grammar, and unrelated metadata
+  changes.
 
 ### Safety
 
@@ -38,6 +53,9 @@ All notable user-visible changes are documented here. The project follows
   spots.
 - Removal fails closed when a selected name remains in a supported exact-name
   prepress dependency, including pre-separated page metadata.
+- The release build backend is exactly pinned and locked; unexpected release
+  filenames, symlinks, extra assets, version drift, and checksum changes fail
+  before publication.
 
 ## [0.2.1] - 2026-08-29
 
@@ -63,5 +81,6 @@ First public beta release.
 - Verify saved output before atomic replacement and preserve an existing forced
   destination whenever processing fails.
 
-[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Hyperrick/spotpdf/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Hyperrick/spotpdf/releases/tag/v0.2.1
