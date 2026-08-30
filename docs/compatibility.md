@@ -54,7 +54,7 @@ must remain equal. Malformed or DTD-bearing metadata is compared as raw decoded
 bytes and therefore cannot use this normalization.
 
 These semantics follow ISO 32000-1 sections 7.3.5, 8.6.6.4–5, and 14.11.3–4 in
-the [official Adobe-hosted ISO 32000-1:2008 copy](https://opensource.adobe.com/dc-acrobat-sdk-docs/standards/pdfstandards/pdf/PDF32000_2008.pdf).
+the [official Adobe-hosted ISO 32000-1:2008 copy](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
 
 ## Rename fail-closed cases
 
@@ -86,6 +86,58 @@ These refusals are intentional. Renaming only the visible Separation array
 while leaving one prepress reference under the old name could split or merge
 plates in downstream production.
 
+## Supported alternate-preview changes
+
+`set-alternate` replaces the composite fallback for one exact, case-sensitive
+spot plate without converting that plate to process color:
+
+```console
+spotpdf set-alternate input.pdf --spot "Varnish" --cmyk 0,80,100,0 -o output.pdf
+```
+
+The CMYK components are four finite percentages in the inclusive range 0–100.
+They are serialized with PDF number precision, so endpoint-adjacent values can
+round to 0 or 100; the command reports the values actually stored.
+Every reachable matching Separation is changed to this shape:
+
+```text
+[/Separation /Varnish /DeviceCMYK <<
+  /FunctionType 2
+  /Domain [0 1]
+  /Range [0 1 0 1 0 1 0 1]
+  /C0 [0 0 0 0]
+  /C1 [0 0.8 1 0]
+  /N 1
+>>]
+```
+
+This linear tint transform maps tint `0` to no process ink and tint `1` to the
+requested CMYK fallback. The Separation name, array identity, resource aliases,
+page/Form streams, and existing tint operands are unchanged. Multiple target
+definitions share one newly created indirect function; an old function shared
+with an unrelated color is never mutated in place.
+
+The target must be an unambiguous spot with at least one reachable Separation.
+The reserved names `/All` and `/None`, canonical process names, arbitrary
+NChannel process components, mixed process/spot roles, absent names, and every
+target-related DeviceN/NChannel occurrence are rejected. Unrelated DeviceN
+spaces do not block the command. Matching remains exact and case-sensitive, so
+a true custom spot named lowercase `/black` is distinct from process `/Black`.
+Target definitions embedded directly inside inline-image dictionaries fail
+closed because changing them would require rewriting content streams. An inline
+image may safely use a resource alias that resolves to a planned Separation.
+
+Malformed target-bearing Separation or DeviceN name fields, invalid Separation
+arrays, signatures, encryption, modification restrictions, parser warnings,
+in-place paths, symlinks, and hard-link aliases all fail without publishing an
+output. Before atomic replacement, the temporary PDF is reopened strictly and
+checked for the exact function, unchanged inventory/content streams, and no
+semantic graph changes outside the planned alternate/tint slots.
+
+The Separation array and tint-function semantics follow ISO 32000-1 sections
+8.6.6.4 and 7.10.3 in the
+[official Adobe-hosted specification](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
+
 ## Supported removal
 
 - Exact, case-sensitive named `/Separation` resources.
@@ -104,8 +156,9 @@ plates in downstream production.
 spot/removal candidates and legacy standalone Separation targets, not
 process-only DeviceN components. Discovery does not imply that removal is
 supported. The `ROLE` column distinguishes spot, process, `/All`, and `/None`;
-the `STATUS` column records removal-preflight context. Rename runs its own
-target-specific structural and hazard preflight after inventory.
+the `STATUS` column records removal-preflight context. `rename` and
+`set-alternate` run their own target-specific structural and hazard preflights
+after inventory.
 
 For NChannel spaces, names in `/Process /Components` are classified as process
 components even when they are arbitrary. Canonical `Cyan`, `Magenta`, `Yellow`,
@@ -127,7 +180,7 @@ colorant.
 
 These rules follow the DeviceN attributes and process-component semantics in
 ISO 32000-1 section 8.6.6.5 and the pre-separated page model in section 14.11.4
-of the [official Adobe-hosted specification](https://opensource.adobe.com/dc-acrobat-sdk-docs/standards/pdfstandards/pdf/PDF32000_2008.pdf).
+of the [official Adobe-hosted specification](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
 
 Signed PDFs may be inventoried, but are never rewritten because a full save
 would invalidate signatures.
@@ -152,7 +205,7 @@ Removal does not publish output when a selected color occurs in:
 
 Malformed content, unknown resources, cyclic Forms, Forms nested deeper than 64
 levels, encryption, modification restrictions, and signatures also block
-mutation. Output symlinks, including dangling symlinks, are rejected rather
+removal. Output symlinks, including dangling symlinks, are rejected rather
 than followed or replaced.
 
 For a new destination, publication uses an operating-system no-clobber

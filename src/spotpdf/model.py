@@ -235,3 +235,12 @@ class RenameResult:
     destination: str
     definitions_renamed: int
     references_renamed: int
+
+
+@dataclass(frozen=True)
+class AlternateResult:
+    """Summary of one alternate CMYK preview change."""
+
+    spot: str
+    cmyk_percentages: tuple[float, float, float, float]
+    definitions_changed: int

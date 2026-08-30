@@ -69,7 +69,7 @@ def _content_stream() -> bytes:
             12,
             48,
             347,
-            "Inspect, rename, and remove PDF spot colors without rasterizing.",
+            "Inspect and safely mutate PDF spot colors without rasterizing.",
             gray=0.78,
         ),
         # Three process-color cards.

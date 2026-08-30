@@ -15,8 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from spotpdf.alternate import validate_cmyk_percentages
 from spotpdf.document import inspect_pdf
-from spotpdf.model import InspectionReport
+from spotpdf.model import InspectionReport, InvalidPdfError
 
 _DOWNLOAD_TIMEOUT_SECONDS = 60
 _COMMAND_TIMEOUT_SECONDS = 180
@@ -39,9 +40,11 @@ class CorpusCase:
     operation: str
     source_spot: str | None = None
     destination_spot: str | None = None
+    cmyk_percentages: tuple[float, float, float, float] | None = None
     remove_spots: tuple[str, ...] = ()
     preserve_names: tuple[str, ...] = ()
     same_composite: bool = False
+    different_composite: bool = False
     byte_identical: bool = False
     expect_empty_inventory: bool = False
 
@@ -164,8 +167,15 @@ def _parse_case(raw: Any) -> CorpusCase:
     destination_spot = _optional_string(raw, "destination_spot")
     if operation == "rename" and (source_spot is None or destination_spot is None):
         raise ValueError(f"rename corpus case {values['id']} requires both spot names")
-    if operation not in {"rename", "remove-all"}:
+    cmyk_percentages = _optional_cmyk(raw, values["id"])
+    if operation == "set-alternate" and (source_spot is None or cmyk_percentages is None):
+        raise ValueError(f"set-alternate corpus case {values['id']} requires a spot and CMYK tuple")
+    if operation not in {"rename", "remove-all", "set-alternate"}:
         raise ValueError(f"unsupported corpus operation: {operation}")
+    same_composite = _optional_bool(raw, "same_composite")
+    different_composite = _optional_bool(raw, "different_composite")
+    if same_composite and different_composite:
+        raise ValueError(f"corpus case {values['id']} has conflicting composite assertions")
     return CorpusCase(
         id=values["id"],
         filename=values["filename"],
@@ -179,9 +189,11 @@ def _parse_case(raw: Any) -> CorpusCase:
         operation=operation,
         source_spot=source_spot,
         destination_spot=destination_spot,
+        cmyk_percentages=cmyk_percentages,
         remove_spots=_string_tuple(raw, "remove_spots"),
         preserve_names=_string_tuple(raw, "preserve_names"),
-        same_composite=_optional_bool(raw, "same_composite"),
+        same_composite=same_composite,
+        different_composite=different_composite,
         byte_identical=_optional_bool(raw, "byte_identical"),
         expect_empty_inventory=_optional_bool(raw, "expect_empty_inventory"),
     )
@@ -206,6 +218,18 @@ def _run_case(case: CorpusCase, source: Path, work: Path, tools: dict[str, str])
             "-o",
             str(output),
         )
+    elif case.operation == "set-alternate":
+        percentages = case.cmyk_percentages or ()
+        _run_spotpdf(
+            "set-alternate",
+            str(source),
+            "--spot",
+            case.source_spot or "",
+            "--cmyk",
+            ",".join(f"{value:g}" for value in percentages),
+            "-o",
+            str(output),
+        )
     else:
         _run_spotpdf("remove", str(source), "--all", "-o", str(output))
 
@@ -215,7 +239,9 @@ def _run_case(case: CorpusCase, source: Path, work: Path, tools: dict[str, str])
     if case.byte_identical and source.read_bytes() != output.read_bytes():
         raise RuntimeError(f"{case.id} expected a byte-identical no-op copy")
     if case.same_composite:
-        _verify_same_composite(tools["pdftoppm"], source, output, work)
+        _verify_composite(tools["pdftoppm"], source, output, work, expect_equal=True)
+    if case.different_composite:
+        _verify_composite(tools["pdftoppm"], source, output, work, expect_equal=False)
     after_plates = _render_separations(tools["gs"], output, work / "plates-after")
     _verify_plates(case, before_plates, after_plates)
 
@@ -230,6 +256,11 @@ def _verify_inventory(
             raise RuntimeError(f"stale source spot after rename: {case.source_spot}")
         if case.destination_spot not in after.colorants:
             raise RuntimeError(f"destination spot absent after rename: {case.destination_spot}")
+    elif case.operation == "set-alternate":
+        if case.source_spot not in before.colorants or case.source_spot not in after.colorants:
+            raise RuntimeError("set-alternate changed or lost the source spot inventory")
+        if set(before.colorants) != set(after.colorants):
+            raise RuntimeError("set-alternate changed the named-colorant inventory")
     for name in case.remove_spots:
         if name in after.colorants:
             raise RuntimeError(f"removed spot remains in inventory: {name}")
@@ -247,6 +278,9 @@ def _verify_plates(case: CorpusCase, before: set[str], after: set[str]) -> None:
             raise RuntimeError(f"Ghostscript did not render source plate: {case.source_spot}")
         if case.source_spot in after or case.destination_spot not in after:
             raise RuntimeError("Ghostscript plate names did not follow the rename")
+    elif case.operation == "set-alternate":
+        if case.source_spot not in before or before != after:
+            raise RuntimeError("set-alternate changed the Ghostscript separation plate set")
     for name in case.remove_spots:
         if name not in before or name in after:
             raise RuntimeError(f"Ghostscript plate removal failed for {name}")
@@ -255,13 +289,22 @@ def _verify_plates(case: CorpusCase, before: set[str], after: set[str]) -> None:
             raise RuntimeError(f"Ghostscript process plate was not preserved: {name}")
 
 
-def _verify_same_composite(renderer: str, source: Path, output: Path, work: Path) -> None:
+def _verify_composite(
+    renderer: str,
+    source: Path,
+    output: Path,
+    work: Path,
+    *,
+    expect_equal: bool,
+) -> None:
     before = _render_composite(renderer, source, work / "composite-before")
     after = _render_composite(renderer, output, work / "composite-after")
-    if len(before) != len(after) or any(
-        left.read_bytes() != right.read_bytes() for left, right in zip(before, after, strict=True)
-    ):
-        raise RuntimeError("rename changed the Poppler composite render")
+    equal = len(before) == len(after) and all(
+        left.read_bytes() == right.read_bytes() for left, right in zip(before, after, strict=True)
+    )
+    if equal != expect_equal:
+        expectation = "stay unchanged" if expect_equal else "change"
+        raise RuntimeError(f"Poppler composite render did not {expectation}")
 
 
 def _render_composite(renderer: str, pdf: Path, directory: Path) -> list[Path]:
@@ -375,6 +418,21 @@ def _optional_bool(raw: dict[str, Any], name: str) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"invalid boolean field: {name}")
     return value
+
+
+def _optional_cmyk(
+    raw: dict[str, Any],
+    case_id: str,
+) -> tuple[float, float, float, float] | None:
+    value = raw.get("cmyk_percentages")
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError(f"invalid CMYK tuple for corpus case {case_id}")
+    try:
+        return validate_cmyk_percentages(value)
+    except InvalidPdfError as error:
+        raise ValueError(f"invalid CMYK tuple for corpus case {case_id}: {error}") from error
 
 
 __all__ = ["CorpusCase", "load_manifest", "obtain_case", "run_public_corpus"]

@@ -49,8 +49,9 @@ For a `v*` tag, `.github/workflows/ci.yml`:
 1. runs Quality and the Python 3.11–3.14 Linux/macOS/Windows test matrix;
 2. downloads every public corpus PDF from a commit-pinned HTTPS URL and checks
    its exact byte count and SHA-256 digest;
-3. validates source and output with qpdf, compares rename composites with
-   Poppler, and checks real plate names with Ghostscript `tiffsep`;
+3. validates source and output with qpdf, checks required equal/different
+   composite renders with Poppler, and checks real plate names with Ghostscript
+   `tiffsep`;
 4. builds with the exactly locked setuptools backend;
 5. inspects and installs both the wheel and source archive;
 6. permits exactly one wheel, one source archive, and `SHA256SUMS`;

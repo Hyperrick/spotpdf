@@ -5,6 +5,22 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- `set-alternate` command for replacing every matching Separation's composite
+  fallback with one linear DeviceCMYK FunctionType 2 preview while preserving
+  the spot plate and all paint operands.
+- A real veraPDF public-corpus case and synthetic before/after render for
+  alternate-preview changes.
+
+### Safety
+
+- Alternate-preview changes reject ambiguous roles, reserved/process names,
+  target-related DeviceN/NChannel use, malformed target name fields, signed or
+  restricted inputs, and unsafe output aliases before publication.
+- In-memory and post-save checks bind inventory, content streams, the complete
+  document graph, and every requested preview definition to the planned change.
+
 ## [0.3.0] - 2026-08-30
 
 ### Added
