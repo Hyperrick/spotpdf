@@ -81,7 +81,7 @@ def emit_check(input_path: Path, spot: str, present: bool, output_format: Output
 
 def emit_remove_spot(
     input_path: Path,
-    output_path: Path,
+    output_path: Path | None,
     spot: str,
     stats: RemovalStats,
     output_format: OutputFormat,
@@ -89,23 +89,28 @@ def emit_remove_spot(
     """Render one exact-name removal result."""
 
     if output_format == TEXT_FORMAT:
-        print(f"Removed {spot!r}: {_stats_text(stats)}; output: {output_path}")
+        if output_path is None:
+            print(
+                f"Dry run verified removal of {spot!r}: {_stats_text(stats)}; no output published"
+            )
+        else:
+            print(f"Removed {spot!r}: {_stats_text(stats)}; output: {output_path}")
         return
+    result = {
+        "selection": {"mode": "spot", "spot": spot},
+        "stats": _removal_stats(stats),
+    }
+    result.update(_mutation_paths(input_path, output_path))
     _emit_success(
         "remove",
         0,
-        {
-            "input": str(input_path),
-            "output": str(output_path),
-            "selection": {"mode": "spot", "spot": spot},
-            "stats": _removal_stats(stats),
-        },
+        result,
     )
 
 
 def emit_remove_all(
     input_path: Path,
-    output_path: Path,
+    output_path: Path | None,
     result: BatchRemovalResult,
     output_format: OutputFormat,
 ) -> None:
@@ -114,53 +119,50 @@ def emit_remove_all(
     if output_format == TEXT_FORMAT:
         _print_batch_result(result, output_path)
         return
-    _emit_success(
-        "remove",
-        0,
-        {
-            "input": str(input_path),
-            "output": str(output_path),
-            "selection": {"mode": "all"},
-            "spots_removed": list(result.spots),
-            "stats": _removal_stats(result.stats),
-        },
-    )
+    payload = {
+        "selection": {"mode": "all"},
+        "spots_removed": list(result.spots),
+        "stats": _removal_stats(result.stats),
+    }
+    payload.update(_mutation_paths(input_path, output_path))
+    _emit_success("remove", 0, payload)
 
 
 def emit_rename(
     input_path: Path,
-    output_path: Path,
+    output_path: Path | None,
     result: RenameResult,
     output_format: OutputFormat,
 ) -> None:
     """Render one exact rename result."""
 
     if output_format == TEXT_FORMAT:
+        prefix = "Dry run verified rename of" if output_path is None else "Renamed"
         print(
-            f"Renamed {result.source!r} to {result.destination!r} in "
+            f"{prefix} {result.source!r} to {result.destination!r} in "
             f"{result.definitions_renamed} color-space definition(s) and "
             f"{result.references_renamed} inventoried exact-name reference(s); "
             "alternate colors, "
-            f"tint transforms, and paint operands preserved; output: {output_path}"
+            f"tint transforms, and paint operands preserved; {_publication_text(output_path)}"
         )
         return
+    payload = {
+        "source": result.source,
+        "destination": result.destination,
+        "definitions_renamed": result.definitions_renamed,
+        "references_renamed": result.references_renamed,
+    }
+    payload.update(_mutation_paths(input_path, output_path))
     _emit_success(
         "rename",
         0,
-        {
-            "input": str(input_path),
-            "output": str(output_path),
-            "source": result.source,
-            "destination": result.destination,
-            "definitions_renamed": result.definitions_renamed,
-            "references_renamed": result.references_renamed,
-        },
+        payload,
     )
 
 
 def emit_alternate(
     input_path: Path,
-    output_path: Path,
+    output_path: Path | None,
     result: AlternateResult,
     output_format: OutputFormat,
 ) -> None:
@@ -168,29 +170,31 @@ def emit_alternate(
 
     if output_format == TEXT_FORMAT:
         cmyk = ",".join(f"{value:g}" for value in result.cmyk_percentages)
+        prefix = "Dry run verified changing" if output_path is None else "Changed"
         print(
-            f"Changed only the alternate preview for {result.spot!r} to "
+            f"{prefix} only the alternate preview for {result.spot!r} to "
             f"DeviceCMYK {cmyk} in {result.definitions_changed} Separation "
             "definition(s); spot name, plate identity, content streams, and paint "
-            f"operands preserved; no process conversion performed; output: {output_path}"
+            "operands preserved; no process conversion performed; "
+            f"{_publication_text(output_path)}"
         )
         return
+    payload = {
+        "spot": result.spot,
+        "cmyk_percentages": list(result.cmyk_percentages),
+        "definitions_changed": result.definitions_changed,
+    }
+    payload.update(_mutation_paths(input_path, output_path))
     _emit_success(
         "set-alternate",
         0,
-        {
-            "input": str(input_path),
-            "output": str(output_path),
-            "spot": result.spot,
-            "cmyk_percentages": list(result.cmyk_percentages),
-            "definitions_changed": result.definitions_changed,
-        },
+        payload,
     )
 
 
 def emit_convert(
     input_path: Path,
-    output_path: Path,
+    output_path: Path | None,
     result: ConversionResult,
     output_format: OutputFormat,
 ) -> None:
@@ -199,32 +203,33 @@ def emit_convert(
     if output_format == TEXT_FORMAT:
         cmyk = ",".join(f"{value:g}" for value in result.cmyk_percentages)
         pages = ",".join(str(page) for page in result.pages_affected) or "none"
+        prefix = "Dry run verified conversion of" if output_path is None else "Converted"
         print(
-            f"Converted {result.spot!r} paint to explicit DeviceCMYK {cmyk}; "
+            f"{prefix} {result.spot!r} paint to explicit DeviceCMYK {cmyk}; "
             f"rewrote {_count(result.color_operators_rewritten, 'color operator')} in "
             f"{_count(result.page_content_sequences_changed, 'page content sequence')} "
             f"and {_count(result.forms_changed, 'Form')}; removed "
             f"{_count(result.definitions_removed, 'Separation definition')} through "
             f"{_count(result.resources_removed, 'resource alias')}; "
             f"pages affected: {pages}; "
-            f"output: {output_path}"
+            f"{_publication_text(output_path)}"
         )
         return
+    payload = {
+        "spot": result.spot,
+        "cmyk_percentages": list(result.cmyk_percentages),
+        "definitions_removed": result.definitions_removed,
+        "resources_removed": result.resources_removed,
+        "page_content_sequences_changed": result.page_content_sequences_changed,
+        "forms_changed": result.forms_changed,
+        "color_operators_rewritten": result.color_operators_rewritten,
+        "pages_affected": list(result.pages_affected),
+    }
+    payload.update(_mutation_paths(input_path, output_path))
     _emit_success(
         "convert",
         0,
-        {
-            "input": str(input_path),
-            "output": str(output_path),
-            "spot": result.spot,
-            "cmyk_percentages": list(result.cmyk_percentages),
-            "definitions_removed": result.definitions_removed,
-            "resources_removed": result.resources_removed,
-            "page_content_sequences_changed": result.page_content_sequences_changed,
-            "forms_changed": result.forms_changed,
-            "color_operators_rewritten": result.color_operators_rewritten,
-            "pages_affected": list(result.pages_affected),
-        },
+        payload,
     )
 
 
@@ -386,18 +391,39 @@ def _print_report(report: InspectionReport) -> None:
         )
 
 
-def _print_batch_result(result: BatchRemovalResult, output: Path) -> None:
+def _print_batch_result(result: BatchRemovalResult, output: Path | None) -> None:
     if not result.spots:
-        print(f"No removable named spot colors found; copied input byte-for-byte; output: {output}")
+        if output is None:
+            print("Dry run verified: no removable named spot colors found; no output published")
+        else:
+            print(
+                f"No removable named spot colors found; copied input byte-for-byte; "
+                f"output: {output}"
+            )
         return
     names = ", ".join(repr(name) for name in result.spots)
+    prefix = "Dry run verified removal of" if output is None else "Removed"
     print(
-        f"Removed {len(result.spots)} named spot color(s): {names}; "
+        f"{prefix} {len(result.spots)} named spot color(s): {names}; "
         f"{_stats_text(result.stats)}; NChannel process components, canonical "
         "/Cyan, /Magenta, /Yellow, /Black, and reserved /All and /None "
         "preserved; "
-        f"output: {output}"
+        f"{_publication_text(output)}"
     )
+
+
+def _mutation_paths(input_path: Path, output_path: Path | None) -> dict[str, Any]:
+    """Return the additive dry-run shape without changing published result contracts."""
+
+    if output_path is None:
+        return {"input": str(input_path), "dry_run": True}
+    return {"input": str(input_path), "output": str(output_path)}
+
+
+def _publication_text(output_path: Path | None) -> str:
+    if output_path is None:
+        return "no output published"
+    return f"output: {output_path}"
 
 
 def _stats_text(stats: RemovalStats) -> str:

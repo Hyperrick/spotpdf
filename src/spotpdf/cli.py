@@ -7,6 +7,7 @@ import sys
 import pikepdf
 
 from .alternate import set_alternate_cmyk
+from .cli_dry_run import mutation_destination
 from .cli_limits import processing_limits_from_args
 from .cli_output import (
     CHECK_PRESENT_EXIT,
@@ -45,56 +46,63 @@ def main(argv: list[str] | None = None) -> int:
             present = check_spot(args.input, args.spot, limits=limits)
             emit_check(args.input, args.spot, present, output_format)
             return CHECK_PRESENT_EXIT if present else 0
+        force_output = args.force and not args.dry_run
         if args.command == "remove":
+            with mutation_destination(args.output, dry_run=args.dry_run) as destination:
+                if args.all_spots:
+                    result = remove_all_spots(
+                        args.input,
+                        destination,
+                        force=force_output,
+                        limits=limits,
+                    )
+                else:
+                    stats = remove_spot(
+                        args.input,
+                        destination,
+                        args.spot,
+                        force=force_output,
+                        limits=limits,
+                    )
             if args.all_spots:
-                result = remove_all_spots(
-                    args.input,
-                    args.output,
-                    force=args.force,
-                    limits=limits,
-                )
                 emit_remove_all(args.input, args.output, result, output_format)
-                return 0
-            stats = remove_spot(
-                args.input,
-                args.output,
-                args.spot,
-                force=args.force,
-                limits=limits,
-            )
-            emit_remove_spot(args.input, args.output, args.spot, stats, output_format)
+            else:
+                emit_remove_spot(args.input, args.output, args.spot, stats, output_format)
             return 0
         if args.command == "rename":
-            result = rename_spot(
-                args.input,
-                args.output,
-                args.spot,
-                args.destination,
-                force=args.force,
-                limits=limits,
-            )
+            with mutation_destination(args.output, dry_run=args.dry_run) as destination:
+                result = rename_spot(
+                    args.input,
+                    destination,
+                    args.spot,
+                    args.destination,
+                    force=force_output,
+                    limits=limits,
+                )
             emit_rename(args.input, args.output, result, output_format)
             return 0
         if args.command == "set-alternate":
-            result = set_alternate_cmyk(
-                args.input,
-                args.output,
-                args.spot,
-                args.cmyk,
-                force=args.force,
-                limits=limits,
-            )
+            with mutation_destination(args.output, dry_run=args.dry_run) as destination:
+                result = set_alternate_cmyk(
+                    args.input,
+                    destination,
+                    args.spot,
+                    args.cmyk,
+                    force=force_output,
+                    limits=limits,
+                )
             emit_alternate(args.input, args.output, result, output_format)
             return 0
         if args.command == "convert":
-            result = convert_spot_to_cmyk(
-                args.input,
-                args.output,
-                args.spot,
-                args.to_cmyk,
-                force=args.force,
-                limits=limits,
-            )
+            with mutation_destination(args.output, dry_run=args.dry_run) as destination:
+                result = convert_spot_to_cmyk(
+                    args.input,
+                    destination,
+                    args.spot,
+                    args.to_cmyk,
+                    force=force_output,
+                    limits=limits,
+                )
             emit_convert(args.input, args.output, result, output_format)
             return 0
     except (SpotPdfError, pikepdf.PdfError, OSError, TypeError, ValueError) as error:

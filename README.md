@@ -272,6 +272,34 @@ spots, stale rename references, or an incorrect alternate definition. The same
 atomic publication guarantee applies to `rename`, `set-alternate`, and
 `convert`.
 
+### Verify a mutation without publishing it
+
+> [!NOTE]
+> `--dry-run` is unreleased and available on `main`; it is not included in
+> stable v0.6.0. Install from a source checkout to use it before the next
+> release.
+
+Every mutating command requires exactly one of `-o/--output` or `--dry-run`.
+A dry run is not an inventory-only estimate: spotpdf performs the same budget
+checks, safety scan, mutation, serialization, strict reopen, and semantic
+verification as a normal output, but uses private temporary storage and deletes
+the verified PDF before reporting success:
+
+```bash
+spotpdf remove input.pdf --all --dry-run
+spotpdf rename input.pdf --spot "Old Name" --to "New Name" --dry-run
+spotpdf set-alternate input.pdf --spot "Varnish" \
+  --cmyk 0,80,100,0 --dry-run
+spotpdf convert input.pdf --spot "Varnish" \
+  --to-cmyk 0,80,100,0 --dry-run
+```
+
+Successful text output says `Dry run` and `no output published`. With
+`--format json`, the normal command result is returned with
+`"dry_run": true` and without an `output` field. Processing failures keep the
+usual exit codes and error records, and no requested output path or directory
+is created. `--force` is unnecessary and has no effect with `--dry-run`.
+
 ## Processing budgets
 
 These controls are included in stable v0.6.0.
@@ -347,8 +375,9 @@ metrics, shared Forms that need conflicting caller state, unresolved resources,
 cyclic Forms, and Form nesting beyond the documented safety limit. See the
 [compatibility notes](https://github.com/Hyperrick/spotpdf/blob/v0.6.0/docs/compatibility.md) for exact behavior.
 
-If a requested removal spot is absent, the input is copied byte-for-byte to the
-new output path. A missing `rename`, `set-alternate`, or `convert` source is an
+If a requested removal spot is absent, a normal run copies the input
+byte-for-byte to the new output path. A dry run verifies the same private copy
+and discards it. A missing `rename`, `set-alternate`, or `convert` source is an
 error and publishes no output. The tool never edits an input file in place.
 
 ## Reproduce the demo
@@ -399,7 +428,8 @@ pdftoppm -png -r 144 -singlefile \
    full syntax check and reject final warnings.
 3. Inventory reachable color declarations and exact-name dependencies.
 4. Build a complete rename, alternate-preview, or conversion plan, or perform a
-   complete removal dry run before changing the in-memory document.
+   complete internal removal planning pass before changing the in-memory
+   document.
 5. Apply only the planned slots or selected paint changes as one operation.
 6. Save beside the destination, reopen strictly, and verify the result.
 7. Atomically replace the destination only after every check succeeds.
@@ -436,9 +466,10 @@ Ghostscript `tiffsep`.
 
 The public beta intentionally keeps plate aliasing, preview changes, explicit
 process conversion, and paint removal as separate operations. Current
-priorities are mutation dry runs, atomic multi-spot recipes, and simpler
-package distribution. New PDF constructs are added only when they can retain
-the same fail-closed and post-save verification guarantees.
+priorities are atomic multi-spot recipes, simpler package distribution, and
+carefully bounded support for more PDF constructs. New constructs are added
+only when they can retain the same fail-closed and post-save verification
+guarantees.
 
 ## Project policy
 
