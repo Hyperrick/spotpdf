@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, Protocol
 
 import pikepdf
 
 from .colors import pdf_name
 from .content_support import operator_name
-from .convert_resources import ColorSpaceRemoval
-from .inventory_graph import walk_reachable
+from .inventory_graph import walk_reachable_with_trailer_roots
 from .inventory_values import path_name, separation_name
 from .model import UnsupportedSpotUseError
 from .objects import ObjectKey, ObjectTracker, object_key
 
 _DIRECT_COLOR_SPACE_NAMES = frozenset({"DeviceGray", "DeviceRGB", "DeviceCMYK", "Pattern"})
+
+
+class _PlannedAliasRemoval(Protocol):
+    key: pikepdf.Name
 
 
 class _AliasDependencyScanner:
@@ -23,11 +27,11 @@ class _AliasDependencyScanner:
     def __init__(
         self,
         pdf: pikepdf.Pdf,
-        spot: str,
-        removals: tuple[ColorSpaceRemoval, ...],
+        spots: frozenset[str],
+        removals: Sequence[_PlannedAliasRemoval],
     ) -> None:
         self.pdf = pdf
-        self.spot = spot
+        self.spots = spots
         self.removed_aliases = frozenset(pdf_name(removal.key) for removal in removals)
         self.scanned_contexts: set[tuple[ObjectKey, tuple[str, ...]]] = set()
         self.scanned_resources: set[ObjectKey] = set()
@@ -44,7 +48,7 @@ class _AliasDependencyScanner:
             if group is not None:
                 self._scan_value(group, aliases, f"page {page_number} /Group")
 
-        for visit in walk_reachable(self.pdf):
+        for visit in walk_reachable_with_trailer_roots(self.pdf):
             value = visit.value
             if not isinstance(value, (pikepdf.Dictionary, pikepdf.Stream)):
                 continue
@@ -58,7 +62,7 @@ class _AliasDependencyScanner:
             self._scan_value(value, self.removed_aliases, min(visit.locations))
 
     def _scan_resources(self, resources: pikepdf.Dictionary, location: str) -> frozenset[str]:
-        aliases = _resource_target_aliases(resources, self.spot, self.removed_aliases)
+        aliases = _resource_target_aliases(resources, self.spots, self.removed_aliases)
         key = object_key(resources)
         self._retain_direct(resources, key)
         self.contextualized.add(key)
@@ -69,7 +73,7 @@ class _AliasDependencyScanner:
         color_spaces = resources.get(pikepdf.Name.ColorSpace, None)
         if isinstance(color_spaces, pikepdf.Dictionary):
             for name, value in color_spaces.items():
-                if separation_name(value) == self.spot:
+                if separation_name(value) in self.spots:
                     continue
                 hits = _color_space_alias_hits(value, aliases)
                 if hits:
@@ -152,16 +156,26 @@ class _AliasDependencyScanner:
 def reject_remaining_alias_dependencies(
     pdf: pikepdf.Pdf,
     spot: str,
-    removals: tuple[ColorSpaceRemoval, ...],
+    removals: Sequence[_PlannedAliasRemoval],
 ) -> None:
     """Reject known references to aliases that the conversion plan would delete."""
 
-    _AliasDependencyScanner(pdf, spot, removals).scan()
+    reject_remaining_alias_dependencies_for_spots(pdf, frozenset({spot}), removals)
+
+
+def reject_remaining_alias_dependencies_for_spots(
+    pdf: pikepdf.Pdf,
+    spots: frozenset[str],
+    removals: Sequence[_PlannedAliasRemoval],
+) -> None:
+    """Reject references to any selected alias planned for deletion."""
+
+    _AliasDependencyScanner(pdf, spots, removals).scan()
 
 
 def _resource_target_aliases(
     resources: pikepdf.Dictionary,
-    spot: str,
+    spots: frozenset[str],
     planned_aliases: frozenset[str],
 ) -> frozenset[str]:
     color_spaces = resources.get(pikepdf.Name.ColorSpace, None)
@@ -170,7 +184,7 @@ def _resource_target_aliases(
     return frozenset(
         pdf_name(name)
         for name, value in color_spaces.items()
-        if pdf_name(name) in planned_aliases and separation_name(value) == spot
+        if pdf_name(name) in planned_aliases and separation_name(value) in spots
     )
 
 
@@ -283,4 +297,7 @@ def _raise_dependency(hits: frozenset[str], location: str, kind: str) -> None:
     )
 
 
-__all__ = ["reject_remaining_alias_dependencies"]
+__all__ = [
+    "reject_remaining_alias_dependencies",
+    "reject_remaining_alias_dependencies_for_spots",
+]

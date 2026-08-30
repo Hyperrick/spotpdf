@@ -26,6 +26,13 @@ All notable user-visible changes are documented here. The project follows
 
 ### Security
 
+- Spot removal now plans every target resource-alias deletion only inside a
+  proven Page/Form content-resource context. Genuine but uninvoked Forms are
+  analyzed across every effective resource scope before selected aliases can be
+  removed. Retained color-space dependencies, Form inline images, selected
+  targets reachable through non-content trailer roots, private resource
+  lookalikes, and resource containers with non-content owners fail closed
+  without replacing an existing destination.
 - The PyPI publisher is isolated in a two-step, tag-only environment job with
   only `id-token: write`; it cannot check out or rebuild repository code and
   uses no stored package-index credential.

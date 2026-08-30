@@ -250,7 +250,18 @@ and 8.6.6.4 in the
   widths or text-position reconstruction.
 - Nested Form XObjects with resolvable resources and one consistent caller
   state.
+- Genuine Form XObjects reachable from a Page through Page/Form
+  `/Resources /XObject` entries are analyzed even when no current page invokes
+  them. A supported target-painted stream is rewritten before its alias is
+  removed; an unused target alias can be removed without changing the stream.
 - Balanced `q`/`Q` graphics-state scopes and pending clipping paths.
+
+Removal plans aliases only from resource dictionaries proven to belong to Page
+or Form content. A target Separation reachable only through `/PieceInfo`, a
+private resource-looking dictionary or stream, metadata, an attachment, or
+another non-content owner is not treated as artwork. The complete mutation
+fails before publication instead of deleting a definition from content that was
+never analyzed.
 
 ## Read-only inventory
 
@@ -319,13 +330,20 @@ Removal does not publish output when a selected color occurs in:
 - soft masks;
 - clipping text;
 - image masks painted through an inherited selected color;
-- Forms that require context-dependent rewriting.
+- Forms that require context-dependent rewriting;
+- retained color spaces, transparency groups, or other color-space fields that
+  still reference a selected resource alias planned for deletion;
+- a target Separation installed as `/DefaultGray`, `/DefaultRGB`, or
+  `/DefaultCMYK`, because deleting a default override would change unrelated
+  device-color operators;
+- target resource aliases outside proven Page/Form content ownership, or a
+  planned resource container that is also reachable from a non-content owner.
 
 An inline image anywhere in a page stream blocks removal for every selected
-spot resource declared by that page, even when the alias is not painted. A Form
-containing an inline image also fails during the dry run when its supported
-rewrite would otherwise change that stream. This conservative rule prevents
-unsafe content-stream reserialization.
+spot resource declared by that page, even when the alias is not painted. The
+same rule applies to every invoked or uninvoked Form and its effective resource
+scope. This prevents both unsafe content-stream reserialization and dangling
+inline-image `/CS` references after alias deletion.
 
 Malformed content, unknown resources, cyclic Forms, Forms nested deeper than 64
 levels, encryption, modification restrictions, and signatures also block
