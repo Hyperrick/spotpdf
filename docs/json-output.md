@@ -77,7 +77,7 @@ A successful inventory has this shape:
     "input": "input.pdf"
   },
   "schema_version": "spotpdf.cli/v1",
-  "spotpdf_version": "0.7.0"
+  "spotpdf_version": "0.7.1"
 }
 ```
 
@@ -100,7 +100,7 @@ A handled failure has this shape:
   "exit_code": 1,
   "ok": false,
   "schema_version": "spotpdf.cli/v1",
-  "spotpdf_version": "0.7.0"
+  "spotpdf_version": "0.7.1"
 }
 ```
 
@@ -163,7 +163,7 @@ changes to the sentence used by the default text output.
 A present name is a successfully evaluated predicate:
 
 ```json
-{"command":"check","exit_code":2,"ok":true,"result":{"input":"input.pdf","present":true,"spot":"Varnish"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.7.0"}
+{"command":"check","exit_code":2,"ok":true,"result":{"input":"input.pdf","present":true,"spot":"Varnish"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.7.1"}
 ```
 
 ### `remove`

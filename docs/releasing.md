@@ -29,7 +29,8 @@ before the first release and confirm that the name is still available.
    project version in `uv.lock` matches.
 3. Move the release notes from `Unreleased` to a dated `X.Y.Z` section and
    update the comparison links.
-4. Update both stable install commands to the exact PyPI pin `spotpdf==X.Y.Z`.
+4. Update all three stable install commands (`python -m pip install`, `uv`, and
+   `pipx`) to the exact PyPI pin `spotpdf==X.Y.Z`.
    The pre-PyPI Git-tag channel remains valid only as a transition; never mix
    channels. Update every tag-bound `github.com` and
    `raw.githubusercontent.com` project-content URL in `README.md` to `vX.Y.Z`.

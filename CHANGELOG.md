@@ -5,6 +5,18 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-30
+
+### Changed
+
+- The project overview now explains who `spotpdf` is for and why an open-source,
+  object-level spot-color editor is useful, without the former focused-beta
+  callout.
+- Installation guidance now includes a conventional, version-pinned
+  `python -m pip install` command for virtual environments and library users.
+  The release gate validates this command alongside the isolated `uv` and
+  `pipx` CLI installation paths.
+
 ## [0.7.0] - 2026-08-30
 
 ### Added
@@ -278,7 +290,8 @@ First public beta release.
 - Verify saved output before atomic replacement and preserve an existing forced
   destination whenever processing fails.
 
-[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Hyperrick/spotpdf/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Hyperrick/spotpdf/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Hyperrick/spotpdf/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Hyperrick/spotpdf/compare/v0.4.0...v0.5.0

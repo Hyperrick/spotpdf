@@ -28,7 +28,13 @@ class ReleaseReadmeTests(unittest.TestCase):
             target = "git+https://github.com/Hyperrick/spotpdf.git@v1.2.3"
         else:
             target = "spotpdf==1.2.3"
-        return f"```bash\nuv tool install {target}\npipx install {target}\n```\n"
+        return (
+            "```bash\n"
+            f"python -m pip install {target}\n"
+            f"uv tool install {target}\n"
+            f"pipx install {target}\n"
+            "```\n"
+        )
 
     def test_accepts_git_tag_and_pypi_install_channels(self) -> None:
         for channel in ("git-tag", "pypi"):
@@ -41,6 +47,7 @@ class ReleaseReadmeTests(unittest.TestCase):
 
     def test_rejects_mixed_or_duplicate_install_channels(self) -> None:
         mixed = "```bash\n" + (
+            "python -m pip install spotpdf==1.2.3\n"
             "uv tool install spotpdf==1.2.3\n"
             "pipx install git+https://github.com/Hyperrick/spotpdf.git@v1.2.3\n"
             "```\n"
@@ -53,6 +60,20 @@ class ReleaseReadmeTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ReleaseReadmeError, "does not uniquely use"):
             validate_release_readme(self.path, duplicate, self.tag)
+
+    def test_pip_install_command_must_be_current_and_unique(self) -> None:
+        command = "python -m pip install spotpdf==1.2.3\n"
+        invalid_texts = {
+            "missing": self._commands("pypi").replace(command, ""),
+            "stale": self._commands("pypi").replace("1.2.3", "1.2.2", 1),
+            "duplicate": self._commands("pypi") + f"```bash\n{command}```\n",
+        }
+        for case, text in invalid_texts.items():
+            with (
+                self.subTest(case=case),
+                self.assertRaisesRegex(ReleaseReadmeError, "install command"),
+            ):
+                validate_release_readme(self.path, text, self.tag)
 
     def test_rejects_repository_relative_markdown_and_html_targets(self) -> None:
         targets = (

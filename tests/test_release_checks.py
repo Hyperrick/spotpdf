@@ -53,6 +53,8 @@ class ReleaseMetadataTests(unittest.TestCase):
         )
         (self.root / "README.md").write_text(
             "```bash\n"
+            "python -m pip install "
+            f"git+https://github.com/Hyperrick/spotpdf.git@{readme_tag}\n"
             "uv tool install "
             f"git+https://github.com/Hyperrick/spotpdf.git@{readme_tag}\n"
             "pipx install "
@@ -142,7 +144,7 @@ class ReleaseMetadataTests(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseCheckError, "release comparison"):
             validate_release_metadata(self.root, "v0.3.0")
 
-    def test_readme_must_have_both_stable_install_commands(self) -> None:
+    def test_readme_must_have_all_stable_install_commands(self) -> None:
         self._write_metadata(readme_tag="v0.2.1")
         with self.assertRaisesRegex(ReleaseCheckError, "install command"):
             validate_release_metadata(self.root, "v0.3.0")

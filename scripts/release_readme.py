@@ -100,7 +100,7 @@ def _stable_install_channel(text: str, path: Path, tag: str) -> str:
         token.content for token in _parse_markdown(text) if token.type in {"code_block", "fence"}
     )
     channels: list[str] = []
-    for command in ("uv tool install", "pipx install"):
+    for command in ("python -m pip install", "uv tool install", "pipx install"):
         git_pattern = re.compile(
             rf"(?m)^{re.escape(command)}[ \t]+{re.escape(PROJECT_GIT_URL)}@v"
             rf"({VERSION_PATTERN.pattern})[ \t]*$"
