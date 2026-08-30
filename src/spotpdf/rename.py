@@ -11,6 +11,7 @@ import pikepdf
 from .inventory import discover_spot_declarations
 from .inventory_graph import walk_reachable
 from .inventory_values import name_value
+from .limits import DEFAULT_PROCESSING_LIMITS, ProcessingLimits, require_processing_limits
 from .model import InspectionReport, RenameResult, SpotPdfError
 from .mutation_verification import (
     ContentFingerprint,
@@ -44,12 +45,14 @@ def rename_spot(
     destination: str,
     *,
     force: bool = False,
+    limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
 ) -> RenameResult:
     """Rename one exact Separation plate and all supported name dependencies."""
 
+    limits = require_processing_limits(limits)
     result: RenameResult | None = None
-    with atomic_pdf_output(input_path, output_path, force=force) as output:
-        with open_strict(output.input_path) as pdf:
+    with atomic_pdf_output(input_path, output_path, force=force, limits=limits) as output:
+        with open_strict(output.input_path, limits=limits) as pdf:
             validate_document_for_mutation(pdf)
             before = discover_spot_declarations(pdf)
             plan = build_rename_plan(pdf, before, source, destination)
@@ -110,7 +113,7 @@ def _verify_saved_pdf(
 ) -> None:
     """Reopen a candidate output and verify semantics before publication."""
 
-    with open_strict(path) as pdf:
+    with open_strict(path, limits=None) as pdf:
         report = discover_spot_declarations(pdf)
         _verify_inventory(
             report,

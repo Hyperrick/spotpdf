@@ -15,7 +15,13 @@ CLI
 
 ## Module responsibilities
 
-- `cli.py` owns arguments, exit codes, and human-readable output.
+- `cli.py` owns command routing, exit codes, and human-readable output;
+  `cli_limits.py` owns the shared positive-integer budget options.
+- `limits.py` owns immutable public processing configuration, metric metadata,
+  and the structured budget-exceeded error.
+- `budget_preflight.py` owns the fixed-order source audit and usage record;
+  `budget_graph.py` and `budget_content.py` perform incremental graph and
+  page/Form content accounting.
 - `document.py` owns inspect/check/remove orchestration and two-pass removal.
 - `inspection.py` combines semantic declarations, structural hazards, and
   content usage into the public read-only report.
@@ -72,7 +78,11 @@ CLI
 The output path is never opened as the working document.
 
 ```text
-strict open
+input-byte check
+  → strict open without recovery
+  → reject open-time warnings
+  → page/graph/content/operator budget preflight
+  → qpdf syntax check and final warnings
   → declaration inventory
   → mutation preflight
   → complete rename/alternate plan or removal dry run
@@ -83,8 +93,9 @@ strict open
   → atomic destination replacement
 ```
 
-Any exception before the last step removes the temporary file. A pre-existing
-destination remains untouched, including when `--force` was requested.
+Any private temporary file created for processing is removed after an exception.
+A pre-existing destination remains untouched, including when `--force` was
+requested.
 
 ## Why planning and apply are separate
 
@@ -125,12 +136,34 @@ decoded raw bytes instead.
 
 ## Resource limits
 
-General object inventory uses iterative, root-context-aware traversal with cycle
-tracking and cached graph edges. Indirect definitions retain their PDF
-object/generation number; direct definitions use a deterministic reachable path
-as their identity. Form invocation and resource nesting are limited to 64 levels
-and fail with a normal user-facing error beyond that boundary. Operators with
-unresolved color spaces, patterns, XObjects, or shadings are rejected when
+Each of the six documented path-based operations (`inspect_pdf`, `check_spot`,
+`remove_spot`, `remove_all_spots`, `rename_spot`, and `set_alternate_cmyk`)
+receives immutable `ProcessingLimits`; no counters or overrides live in mutable
+CLI/module globals. File size is checked before `pikepdf.open()`. After a
+non-recovering open and rejection of immediate warnings, one fresh source audit
+checks pages, trailer-reachable graph entries, decoded page/Form content, and
+lexical content operators in that order. Only then does qpdf's complete syntax
+check run and final warnings get rejected. The limits are inclusive and an
+overrun occurs on the first value above the configured boundary. Saved-output
+verification is not charged against the source a second time, so the contract
+does not vary with the fixed number of dry-run, apply, or verification passes.
+Exact semantics are normative in
+[processing-budgets.md](processing-budgets.md).
+
+Budget graph traversal is iterative and charges each Array item or
+Dictionary/Stream value before following it. Shared targets are expanded once
+while alias entries still consume work; a large container is never converted
+into a separate complete edge tuple for this audit. Decoded byte counting uses
+native qpdf buffers without an additional Python `bytes` copy. Operator
+accounting uses pikepdf's streaming token filter and discards its output rather
+than building a complete instruction list just to enforce the limit.
+
+The processing budgets coexist with the fixed Form invocation/resource nesting
+limit of 64. General semantic inventory separately uses iterative,
+root-context-aware traversal with cycle tracking and cached graph edges.
+Indirect definitions retain their PDF object/generation number; direct
+definitions use a deterministic reachable path as their identity. Operators
+with unresolved color spaces, patterns, XObjects, or shadings are rejected when
 encountered during a removal pass.
 
 Read-only usage inventory performs one ordered structural-hazard traversal and
@@ -149,5 +182,11 @@ stable PDF object identity. Regression fixtures grow pages/Forms and shared
 resource aliases from 64 to 128 objects to guard both paths against quadratic
 cross-expansion.
 
-The tool does not impose whole-process CPU or memory quotas. Use an external
-sandbox for hostile PDFs as described in [SECURITY.md](../SECURITY.md).
+Application accounting begins only after qpdf has parsed enough native
+structure to expose the graph. One stream's supported non-lossy content filters
+are decoded before its length can be observed, and the later syntax check may
+decode non-content streams excluded from the page/Form byte budget. Therefore
+the tool does not impose whole-process CPU, memory, time, or temporary-output
+quotas. qpdf's own parser/filter limits are another independent layer. Use
+external process isolation for hostile PDFs as described in
+[SECURITY.md](../SECURITY.md).
