@@ -18,7 +18,7 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def smoke_archive(archive: Path) -> None:
-    """Install one archive and run inventory, rename, and all-spot removal."""
+    """Install one archive and run preview, rename, and all-spot mutations."""
 
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
@@ -31,12 +31,26 @@ def smoke_archive(archive: Path) -> None:
         run(["uv", "pip", "install", "--python", str(python), str(archive.resolve())])
 
         source = root / "input.pdf"
+        alternate = root / "alternate.pdf"
         renamed = root / "renamed.pdf"
         output = root / "output.pdf"
         generator = Path(__file__).parents[1] / "examples" / "create_demo_pdf.py"
         run([sys.executable, str(generator), str(source)])
         version = run([str(executable), "--version"])
         before = run([str(executable), "list", str(source)])
+        alternate_result = run(
+            [
+                str(executable),
+                "set-alternate",
+                str(source),
+                "--spot",
+                "Varnish",
+                "--cmyk",
+                "100,0,0,0",
+                "-o",
+                str(alternate),
+            ]
+        )
         run(
             [
                 str(executable),
@@ -67,6 +81,8 @@ def smoke_archive(archive: Path) -> None:
             raise SystemExit(f"unexpected installed version from {archive.name}")
         if "Varnish" not in before.stdout:
             raise SystemExit(f"demo spot not found with {archive.name}")
+        if "no process conversion performed" not in alternate_result.stdout:
+            raise SystemExit(f"alternate-preview command failed with {archive.name}")
         renamed_names = {
             line.split("\t", 1)[0]
             for line in after_rename.stdout.splitlines()

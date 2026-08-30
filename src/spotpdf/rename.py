@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -14,6 +12,13 @@ from .inventory import discover_spot_declarations
 from .inventory_graph import walk_reachable
 from .inventory_values import name_value
 from .model import InspectionReport, RenameResult, SpotPdfError
+from .mutation_verification import (
+    ContentFingerprint,
+    InventoryFingerprint,
+    content_fingerprint,
+    inventory_fingerprint,
+    parse_content_streams,
+)
 from .objects import object_key
 from .publication import atomic_pdf_output, open_strict, save_pdf
 from .rename_plan import build_rename_plan
@@ -25,17 +30,6 @@ from .rename_slots import (
 )
 from .scan import validate_document_for_mutation
 
-
-@dataclass(frozen=True)
-class _InventoryFingerprint:
-    """Location-independent semantic inventory used across a saved rewrite."""
-
-    colorants: tuple[tuple[Any, ...], ...]
-    definitions: tuple[tuple[Any, ...], ...]
-    dependencies: tuple[tuple[Any, ...], ...]
-
-
-_ContentFingerprint: TypeAlias = Counter[tuple[str, tuple[str, ...], bytes]]
 _PreviewFingerprint: TypeAlias = Counter[
     tuple[str, tuple[str, ...], tuple[Any, ...], tuple[Any, ...]]
 ]
@@ -59,8 +53,8 @@ def rename_spot(
             validate_document_for_mutation(pdf)
             before = discover_spot_declarations(pdf)
             plan = build_rename_plan(pdf, before, source, destination)
-            expected_inventory = _inventory_fingerprint(before)
-            expected_content = _content_fingerprint(pdf)
+            expected_inventory = inventory_fingerprint(before)
+            expected_content = content_fingerprint(pdf)
             expected_preview = _preview_fingerprint(pdf, source)
             expected_plan = plan.preflight_fingerprint()
             expected_apply_document = plan.normalized_document_fingerprint(pdf)
@@ -75,7 +69,7 @@ def rename_spot(
                 destination,
             )
             _verify_plan_semantics(pdf, after, destination, source, expected_plan)
-            if _content_fingerprint(pdf) != expected_content:
+            if content_fingerprint(pdf) != expected_content:
                 raise SpotPdfError("rename unexpectedly changed PDF content streams")
             _verify_preview(pdf, destination, expected_preview)
             _verify_apply_semantics(pdf, plan, expected_apply_document)
@@ -106,8 +100,8 @@ def rename_spot(
 
 def _verify_saved_pdf(
     path: Path,
-    expected_inventory: _InventoryFingerprint,
-    expected_content: _ContentFingerprint,
+    expected_inventory: InventoryFingerprint,
+    expected_content: ContentFingerprint,
     expected_preview: _PreviewFingerprint,
     expected_plan: _PlanFingerprint,
     expected_document: _DocumentFingerprint,
@@ -125,10 +119,10 @@ def _verify_saved_pdf(
             destination,
         )
         _verify_plan_semantics(pdf, report, destination, source, expected_plan)
-        if _content_fingerprint(pdf) != expected_content:
+        if content_fingerprint(pdf) != expected_content:
             raise SpotPdfError("saved PDF content streams differ after rename")
         _verify_preview(pdf, destination, expected_preview)
-        _parse_content_streams(pdf)
+        parse_content_streams(pdf)
         _verify_saved_document_semantics(pdf, expected_document)
 
 
@@ -170,7 +164,7 @@ def _verify_plan_semantics(
 
 def _verify_inventory(
     report: InspectionReport,
-    expected: _InventoryFingerprint,
+    expected: InventoryFingerprint,
     source: str,
     destination: str,
 ) -> None:
@@ -180,82 +174,9 @@ def _verify_inventory(
         raise SpotPdfError(f"post-rename validation found stale source name {source!r}")
     if destination not in report.colorants:
         raise SpotPdfError(f"post-rename validation did not find target name {destination!r}")
-    actual = _inventory_fingerprint(report, normalize=(destination, source))
+    actual = inventory_fingerprint(report, normalize=(destination, source))
     if actual != expected:
         raise SpotPdfError("post-rename semantic inventory differs beyond the requested name")
-
-
-def _inventory_fingerprint(
-    report: InspectionReport,
-    *,
-    normalize: tuple[str, str] | None = None,
-) -> _InventoryFingerprint:
-    """Create a deterministic semantic signature, excluding expected path changes."""
-
-    def name(value: str) -> str:
-        if normalize is not None and value == normalize[0]:
-            return normalize[1]
-        return value
-
-    colorants = tuple(
-        sorted(
-            (
-                name(colorant_name),
-                tuple(sorted(role.value for role in summary.roles)),
-                tuple(sorted(kind.value for kind in summary.kinds)),
-            )
-            for colorant_name, summary in report.colorants.items()
-        )
-    )
-    definitions = tuple(
-        sorted(
-            (
-                definition.kind.value,
-                tuple((name(item.name), item.role.value) for item in definition.components),
-                definition.subtype or "",
-                definition.process_color_space or "",
-                tuple(name(item) for item in definition.process_components),
-                tuple(sorted(name(item) for item in definition.individual_colorants)),
-            )
-            for definition in report.definitions.values()
-        )
-    )
-    dependency_counts = Counter((name(item.name), item.kind.value) for item in report.dependencies)
-    dependencies = tuple(
-        sorted(
-            (dependency_name, kind, count)
-            for (dependency_name, kind), count in dependency_counts.items()
-        )
-    )
-    return _InventoryFingerprint(colorants, definitions, dependencies)
-
-
-def _content_fingerprint(pdf: pikepdf.Pdf) -> _ContentFingerprint:
-    """Hash every page, Form, and appearance content stream without rewriting it."""
-
-    records: dict[tuple[Any, ...], tuple[str, bytes, set[str]]] = {}
-    for visit in walk_reachable(pdf):
-        value = visit.value
-        if not isinstance(value, pikepdf.Stream):
-            continue
-        key = object_key(value)
-        subtype = value.get(pikepdf.Name.Subtype, None)
-        if subtype == pikepdf.Name.Form:
-            kind = "Form"
-        elif any(_is_contents_path(location) for location in visit.locations):
-            kind = "Page"
-        else:
-            continue
-        identity = key if key[0] == "indirect" else ("direct", min(visit.locations))
-        digest = hashlib.sha256(value.read_bytes()).digest()
-        record = records.setdefault(identity, (kind, digest, set()))
-        if record[:2] != (kind, digest):
-            raise SpotPdfError("one content stream changed while it was being inspected")
-        record[2].update(visit.locations)
-    fingerprints: _ContentFingerprint = Counter()
-    for kind, digest, locations in records.values():
-        fingerprints[(kind, tuple(sorted(locations)), digest)] += 1
-    return fingerprints
 
 
 def _preview_fingerprint(
@@ -307,33 +228,3 @@ def _verify_preview(
 ) -> None:
     if _preview_fingerprint(pdf, name) != expected:
         raise SpotPdfError("color-space alternate spaces or tint transforms changed during rename")
-
-
-def _is_contents_path(location: str) -> bool:
-    marker = " /Contents"
-    start = location.find(marker)
-    while start >= 0:
-        following = start + len(marker)
-        if following == len(location) or location[following] in " [":
-            return True
-        start = location.find(marker, start + 1)
-    return False
-
-
-def _parse_content_streams(pdf: pikepdf.Pdf) -> None:
-    """Require every page and reachable Form stream to remain parseable."""
-
-    for page in pdf.pages:
-        pikepdf.parse_content_stream(page)
-    seen: set[tuple[Any, ...]] = set()
-    for visit in walk_reachable(pdf):
-        value = visit.value
-        if not isinstance(value, pikepdf.Stream):
-            continue
-        if value.get(pikepdf.Name.Subtype, None) != pikepdf.Name.Form:
-            continue
-        key = object_key(value)
-        if key in seen:
-            continue
-        seen.add(key)
-        pikepdf.parse_content_stream(value)

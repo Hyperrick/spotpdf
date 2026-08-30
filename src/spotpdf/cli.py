@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pikepdf
 
+from .alternate import parse_cmyk_percentages, set_alternate_cmyk
 from .document import check_spot, inspect_pdf, remove_all_spots, remove_spot
 from .model import BatchRemovalResult, RemovalStats, SpotPdfError, __version__
 from .rename import rename_spot
@@ -16,7 +17,7 @@ from .rename import rename_spot
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="spotpdf",
-        description="Inspect, rename, and remove named spot colors in vector PDF content.",
+        description="Inspect and safely mutate named spot colors in vector PDF content.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -69,6 +70,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace an existing output after validation",
     )
+
+    alternate_parser = commands.add_parser(
+        "set-alternate",
+        help="change only one Separation spot's alternate CMYK preview",
+    )
+    alternate_parser.add_argument("input", type=Path, help="input PDF")
+    alternate_parser.add_argument("--spot", required=True, help="exact spot name")
+    alternate_parser.add_argument(
+        "--cmyk",
+        required=True,
+        type=parse_cmyk_percentages,
+        metavar="C,M,Y,K",
+        help="four finite CMYK percentages in the inclusive range 0..100",
+    )
+    alternate_parser.add_argument("-o", "--output", required=True, type=Path, help="output PDF")
+    alternate_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace an existing output after validation",
+    )
     return parser
 
 
@@ -113,6 +134,22 @@ def main(argv: list[str] | None = None) -> int:
                 f"{result.references_renamed} inventoried exact-name reference(s); "
                 "alternate colors, "
                 f"tint transforms, and paint operands preserved; output: {args.output}"
+            )
+            return 0
+        if args.command == "set-alternate":
+            result = set_alternate_cmyk(
+                args.input,
+                args.output,
+                args.spot,
+                args.cmyk,
+                force=args.force,
+            )
+            cmyk = ",".join(f"{value:g}" for value in result.cmyk_percentages)
+            print(
+                f"Changed only the alternate preview for {result.spot!r} to "
+                f"DeviceCMYK {cmyk} in {result.definitions_changed} Separation "
+                "definition(s); spot name, plate identity, content streams, and paint "
+                f"operands preserved; no process conversion performed; output: {args.output}"
             )
             return 0
     except (SpotPdfError, pikepdf.PdfError, OSError, TypeError, ValueError) as error:

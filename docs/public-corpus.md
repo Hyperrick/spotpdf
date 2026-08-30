@@ -11,7 +11,7 @@ operation.
 | Upstream case | License | Release assertion |
 | --- | --- | --- |
 | Ghostscript `examples/spots2.pdf` | AGPL-3.0-or-later | `remove --all` removes three painted custom plates. |
-| veraPDF t01-pass-b | CC BY 4.0 | Rename with a DeviceCMYK alternate stays pixel-identical. |
+| veraPDF t01-pass-b | CC BY 4.0 | `set-alternate` preserves the spot plate while changing the composite preview. |
 | veraPDF t01-pass-c | CC BY 4.0 | DeviceN components and `/Colorants` dependencies rename together. |
 | veraPDF t01-pass-f | CC BY 4.0 | Rename preserves a DeviceRGB alternate and composite appearance. |
 | veraPDF t02-pass-a | CC BY 4.0 | `remove --all` preserves arbitrary NChannel process components as a byte-identical no-op. |
@@ -52,7 +52,9 @@ uv run python scripts/check_public_corpus.py --offline
 
 For every case the runner executes `qpdf --check`, renders real separation
 plates with Ghostscript `tiffsep`, and validates the post-operation inventory.
-Rename cases additionally compare all Poppler-rendered pages byte-for-byte
-within the same run. The gate deliberately does not store golden raster hashes,
-because different RIP versions may produce different but internally consistent
-raster files.
+Rename cases additionally require all Poppler-rendered pages to remain
+byte-for-byte equal within the same run. The alternate-preview case requires
+the composite to change while the Ghostscript separation plate set stays
+identical. The gate deliberately does not store golden raster hashes, because
+different RIP versions may produce different but internally consistent raster
+files.

@@ -22,7 +22,7 @@ def run(
 
 
 def create_docs_images(repository: Path) -> None:
-    """Create removal renders and the rename terminal walkthrough."""
+    """Create removal/preview renders and the rename terminal walkthrough."""
 
     renderer = shutil.which("pdftoppm")
     if renderer is None:
@@ -34,6 +34,7 @@ def create_docs_images(repository: Path) -> None:
         root = Path(temp_dir)
         source = root / "demo.pdf"
         renamed = root / "renamed.pdf"
+        alternate = root / "alternate.pdf"
         removed = root / "removed.pdf"
         generator = repository / "examples" / "create_demo_pdf.py"
 
@@ -51,15 +52,33 @@ def create_docs_images(repository: Path) -> None:
             str(renamed),
         ).stdout
         after = _spotpdf(repository, "list", str(renamed)).stdout
+        _spotpdf(
+            repository,
+            "set-alternate",
+            str(source),
+            "--spot",
+            "Varnish",
+            "--cmyk",
+            "100,0,0,0",
+            "-o",
+            str(alternate),
+        )
+        alternate_inventory = _spotpdf(repository, "list", str(alternate)).stdout
+        if alternate_inventory != before:
+            raise SystemExit("set-alternate documentation inventory changed")
         _spotpdf(repository, "remove", str(source), "--all", "-o", str(removed))
 
         before_png = _render(renderer, source, root / "before")
         renamed_png = _render(renderer, renamed, root / "renamed")
+        alternate_png = _render(renderer, alternate, root / "alternate")
         removed_png = _render(renderer, removed, root / "after")
         if before_png.read_bytes() != renamed_png.read_bytes():
             raise SystemExit("rename documentation render is not pixel-identical")
+        if before_png.read_bytes() == alternate_png.read_bytes():
+            raise SystemExit("set-alternate documentation render did not change")
 
         shutil.copyfile(before_png, images / "demo-before.png")
+        shutil.copyfile(alternate_png, images / "demo-alternate.png")
         shutil.copyfile(removed_png, images / "demo-after.png")
         (images / "demo-rename.svg").write_text(
             _rename_svg(before, after, rename_result),

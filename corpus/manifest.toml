@@ -24,10 +24,10 @@ sha256 = "6f81feb3b805e24b5de34cb5a7bd2f64ebce9818b23c953865d4590feb13abd0"
 bytes = 492362
 license = "CC-BY-4.0"
 license_url = "https://github.com/veraPDF/veraPDF-corpus/blob/01e40281d48e2f3755006fdf596ca25caaea8634/README.md"
-operation = "rename"
+operation = "set-alternate"
 source_spot = "Custom"
-destination_spot = "ReleaseGateCustom"
-same_composite = true
+cmyk_percentages = [0, 100, 0, 0]
+different_composite = true
 
 [[case]]
 id = "verapdf-devicen-colorants"

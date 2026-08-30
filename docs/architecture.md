@@ -6,7 +6,7 @@
 CLI
  └─ document orchestration and atomic publication
      ├─ semantic color-space inventory
-     ├─ complete spot-rename planning and application
+     ├─ complete rename and alternate-preview planning
      ├─ content resource resolution
      ├─ document safety preflight
      └─ stateful content-stream rewrite
@@ -20,6 +20,14 @@ CLI
 - `publication.py` owns strict opening, compatibility-preserving saves,
   temporary output, and atomic/no-clobber publication shared by mutating
   commands.
+- `alternate.py` owns alternate-preview request parsing, mutation orchestration,
+  and in-memory/post-save verification.
+- `alternate_plan.py` discovers every matching Separation, rejects target-related
+  DeviceN/malformed use, and owns exact preview-slot application.
+- `alternate_validation.py` validates existing alternate spaces/tint functions
+  and rejects target definitions embedded in inline-image content dictionaries.
+- `mutation_verification.py` owns inventory/content fingerprints and saved
+  content-stream parse checks shared by non-removal mutations.
 - `rename.py` owns rename orchestration, location-bound fingerprints, reverse
   planning, and post-save semantic verification.
 - `rename_request.py` validates source/destination names and inventory roles.
@@ -57,7 +65,7 @@ The output path is never opened as the working document.
 strict open
   → declaration inventory
   → mutation preflight
-  → complete rename plan or removal dry run
+  → complete rename/alternate plan or removal dry run
   → in-memory rewrite
   → in-memory semantic check
   → save to sibling temporary file
@@ -73,10 +81,12 @@ destination remains untouched, including when `--force` was requested.
 Removal semantics can depend on inherited graphics state, Form resources, and
 text rendering modes, so removal performs a full dry run. Rename first builds a
 deduplicated plan containing every definition slot and supported exact-name
-reference. In both cases the plan is known to be complete before any in-memory
-object is changed. Removal currently pays for a second stream parse; rename does
-not interpret or rewrite paint operands. It does parse page and Form content
-syntax after saving and compares their location-bound decoded stream hashes.
+reference. `set-alternate` builds a deduplicated one-to-one plan for every target
+Separation and rejects target-related DeviceN use. In every case the plan is
+known to be complete before any in-memory object is changed. Removal currently
+pays for a second stream parse; rename and alternate-preview changes do not
+interpret or rewrite paint operands. They parse page and Form content syntax
+after saving and compare location-bound decoded stream hashes.
 
 For dictionary-key references such as `/Colorants`, `/Solidities`, and
 `/DotGain`, planning also checks the destination key before deleting the source
@@ -88,6 +98,13 @@ The whole-document guard masks only the exact slots in that plan while comparing
 the pre- and post-apply graph. A second exact post-apply fingerprint includes
 catalog, page tree, document information, and other semantic trailer entries and
 must still match after the temporary output is reopened.
+
+Alternate-preview planning uses the same whole-document guard but masks only
+members 2 and 3 of each planned Separation array. Apply replaces those members
+with `/DeviceCMYK` and one shared indirect FunctionType 2 dictionary. The spot
+name, Separation array identity, tint operands, resources, and content streams
+remain untouched. Inventory coverage, the requested function, and full document
+semantics are checked in memory and again after strict reopen.
 
 Decoded streams remain byte-sensitive. The only storage normalization is for a
 valid `/Type /Metadata` plus `/Subtype /XML` stream: the XML root, comments,

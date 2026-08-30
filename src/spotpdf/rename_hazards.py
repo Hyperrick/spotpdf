@@ -91,10 +91,7 @@ def devicen_target_mentions(value: pikepdf.Array, names: frozenset[str]) -> bool
     """Detect target names in DeviceN name-bearing fields, including malformed ones."""
 
     components = value[1] if len(value) >= 2 else None
-    if isinstance(components, pikepdf.Array):
-        if name_or_string_array_has_any(components, names):
-            return True
-    elif name_or_string(components) in names:
+    if name_field_mentions(components, names):
         return True
     attributes = value[4] if len(value) >= 5 else None
     return name_or_string(attributes) in names or subtree_mentions(attributes, names)
@@ -140,12 +137,6 @@ def name_array_contains(value: Any, name: str) -> bool:
 
 def name_array_has_any(value: Any, names: frozenset[str]) -> bool:
     return isinstance(value, pikepdf.Array) and any(name_value(item) in names for item in value)
-
-
-def name_or_string_array_has_any(value: Any, names: frozenset[str]) -> bool:
-    """Match decoded PDF Names and strings in alternating prepress arrays."""
-
-    return isinstance(value, pikepdf.Array) and any(name_or_string(item) in names for item in value)
 
 
 def mixing_hints_contain(
