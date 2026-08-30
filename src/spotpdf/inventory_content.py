@@ -500,6 +500,20 @@ class _ContentInventoryScanner:
             self.result.metrics.form_streams_parsed += 1
             self.result.metrics.instructions_visited += len(instructions)
             label = f"{parent_label} Form {form_key}"
+            if _contains_inline_image(instructions):
+                aliases = resource_aliases_for_spots(resources, frozenset(fresh))
+                hits = frozenset(
+                    colorant
+                    for info in aliases.values()
+                    for colorant in info.colorants
+                    if colorant in fresh
+                )
+                self._reject(
+                    hits,
+                    f"{label}: inline images with target spot resources are not supported",
+                    participants,
+                )
+                fresh.difference_update(hits)
             changed = self._scan_stream(
                 instructions,
                 resources,
@@ -509,12 +523,6 @@ class _ContentInventoryScanner:
                 frozenset(fresh),
                 form_depth,
             )
-            if _contains_inline_image(instructions):
-                self._reject(
-                    changed,
-                    f"{label}: rewriting a stream with inline images is not supported",
-                    frozenset(fresh),
-                )
             changed &= self._eligible(frozenset(fresh))
             self.processed_forms[form_key] = FormScan(
                 resource_identity=resource_identity,

@@ -213,10 +213,15 @@ class SinglePassInventoryTests(unittest.TestCase):
 
         self.assertEqual(summary.pages, set())
         self.assertEqual(summary.paint_operations, 0)
-        self.assertTrue(any("rewriting a stream with inline images" in x for x in summary.contexts))
+        self.assertTrue(
+            any(
+                "inline images with target spot resources" in context
+                for context in summary.contexts
+            )
+        )
         with self.assertRaisesRegex(
             UnsupportedSpotUseError,
-            "rewriting a stream with inline images",
+            "inline images with target spot resources",
         ):
             remove_spot(source, output, "InlineFormSpot")
         self.assertFalse(output.exists())

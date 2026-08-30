@@ -9,14 +9,13 @@ import pikepdf
 
 from .convert_resource_contexts import (
     ContentResourceContext,
-    ContentResourceGraph,
     build_content_resource_graph,
 )
-from .inventory_graph import walk_reachable_with_trailer_roots
 from .inventory_values import path_name, separation_name
 from .model import SpotPdfError, UnsupportedSpotUseError
-from .objects import ObjectKey, object_key
+from .objects import object_key
 from .rename_slots import semantic_object_fingerprint
+from .resource_owners import reject_unapproved_resource_container_owners
 from .separation_targets import SeparationTargetSet
 
 _DEFAULT_COLOR_SPACES = {
@@ -100,7 +99,7 @@ def collect_target_resource_removals(
         if context_has_target:
             target_contexts.append((context, color_spaces))
 
-    _reject_unapproved_container_owners(pdf, resource_graph, target_contexts)
+    reject_unapproved_resource_container_owners(pdf, resource_graph, target_contexts)
 
     planned_locations = frozenset(
         location for removal in removals.values() for location in removal.locations
@@ -117,53 +116,6 @@ def collect_target_resource_removals(
             "not every target Separation definition has a removable resource alias"
         )
     return tuple(sorted(removals.values(), key=lambda item: item.label))
-
-
-def _reject_unapproved_container_owners(
-    pdf: pikepdf.Pdf,
-    graph: ContentResourceGraph,
-    targets: list[tuple[ContentResourceContext, pikepdf.Dictionary]],
-) -> None:
-    approved: dict[ObjectKey, set[str]] = {}
-    approved_form_locations: dict[ObjectKey, set[str]] = {}
-    for owner in graph.form_owners:
-        approved_form_locations.setdefault(owner.form_key, set()).add(owner.location)
-
-    for context, color_spaces in targets:
-        _record_indirect_approval(approved, context.resources, set(context.locations))
-        _record_indirect_approval(
-            approved,
-            color_spaces,
-            {f"{location} /ColorSpace" for location in context.locations},
-        )
-        for form_key in context.owner_form_keys:
-            approved.setdefault(form_key, set()).update(
-                approved_form_locations.get(form_key, set())
-            )
-
-    if not approved:
-        return
-    observed = {key: set() for key in approved}
-    for visit in walk_reachable_with_trailer_roots(pdf):
-        key = object_key(visit.value)
-        if key in observed:
-            observed[key].update(visit.locations)
-    for key, locations in observed.items():
-        unexpected = locations - approved[key]
-        if unexpected:
-            raise UnsupportedSpotUseError(
-                f"{min(unexpected)}: target resource container has a non-content owner"
-            )
-
-
-def _record_indirect_approval(
-    approved: dict[ObjectKey, set[str]],
-    value: object,
-    locations: set[str],
-) -> None:
-    key = object_key(value)
-    if key[0] == "indirect":
-        approved.setdefault(key, set()).update(locations)
 
 
 __all__ = ["ColorSpaceRemoval", "collect_target_resource_removals"]

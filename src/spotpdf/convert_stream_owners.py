@@ -175,9 +175,16 @@ def _reject_unsafe_locations(
         return
 
     inherited_contexts = {
-        owner.effective_resource_key for owner in form_owners if owner.inherits_resources
+        _rewriter_resource_key(owner.effective_resource_key)
+        for owner in form_owners
+        if owner.inherits_resources
     }
-    if len(inherited_contexts) > 1:
+    approved_inherited_contexts = getattr(
+        write,
+        "approved_inherited_contexts",
+        frozenset(),
+    )
+    if len(inherited_contexts) > 1 and inherited_contexts != approved_inherited_contexts:
         raise UnsupportedSpotUseError(
             f"{write.label}: a resource-inheriting Form has multiple owner contexts"
         )
@@ -196,6 +203,14 @@ def _form_owners_by_key(
     for owner in owners:
         grouped.setdefault(owner.form_key, []).append(owner)
     return {key: tuple(items) for key, items in grouped.items()}
+
+
+def _rewriter_resource_key(key: tuple[object, ...]) -> tuple[object, ...]:
+    if key[0] == "resources":
+        return tuple(key[1:])
+    if key[0] == "resources-at":
+        return ("direct-at", *key[1:], "Resources")
+    return key
 
 
 def _classify_external_owner(location: str) -> _OwnerRole:
