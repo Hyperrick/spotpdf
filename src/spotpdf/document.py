@@ -117,8 +117,8 @@ def check_spot(
 
 
 def remove_spot(
-    input_path: Path,
-    output_path: Path,
+    input_path: str | PathLike[str],
+    output_path: str | PathLike[str],
     spot: str,
     *,
     force: bool = False,
@@ -126,6 +126,8 @@ def remove_spot(
 ) -> RemovalStats:
     """Remove supported uses of one spot color and atomically write a clean PDF."""
 
+    input_path = Path(input_path)
+    output_path = Path(output_path)
     result = _remove_spots(
         input_path,
         output_path,
@@ -137,14 +139,16 @@ def remove_spot(
 
 
 def remove_all_spots(
-    input_path: Path,
-    output_path: Path,
+    input_path: str | PathLike[str],
+    output_path: str | PathLike[str],
     *,
     force: bool = False,
     limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
 ) -> BatchRemovalResult:
     """Remove supported spots while preserving process and special colorants."""
 
+    input_path = Path(input_path)
+    output_path = Path(output_path)
     return _remove_spots(
         input_path,
         output_path,

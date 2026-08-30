@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from os import PathLike
 from pathlib import Path
 from typing import Any
 
@@ -35,8 +36,8 @@ from .scan import validate_document_for_mutation
 
 
 def set_alternate_cmyk(
-    input_path: Path,
-    output_path: Path,
+    input_path: str | PathLike[str],
+    output_path: str | PathLike[str],
     spot: str,
     cmyk: Sequence[object],
     *,
@@ -45,6 +46,8 @@ def set_alternate_cmyk(
 ) -> AlternateResult:
     """Replace every matching Separation preview with one linear CMYK fallback."""
 
+    input_path = Path(input_path)
+    output_path = Path(output_path)
     limits = require_processing_limits(limits)
     percentages = validate_cmyk_percentages(cmyk)
     normalized = normalized_cmyk(percentages)

@@ -4,11 +4,13 @@ include LICENSE
 include README.md
 include SECURITY.md
 include SUPPORT.md
+include src/spotpdf/py.typed
 include docs/architecture.md
 include docs/compatibility.md
 include docs/json-output.md
 include docs/performance.md
 include docs/processing-budgets.md
+include docs/python-api.md
 include docs/public-corpus.md
 include docs/releasing.md
 include docs/images/demo-after.png

@@ -32,18 +32,34 @@ class DistributionCheckTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name)
 
-    def _write_archives(self, wheel_metadata: bytes, sdist_metadata: bytes) -> None:
+    def _write_archives(
+        self,
+        wheel_metadata: bytes,
+        sdist_metadata: bytes,
+        *,
+        wheel_marker: bool = True,
+        source_marker: bool = True,
+        source_marker_path: str = "spotpdf-0.6.0/src/spotpdf/py.typed",
+        source_metadata_path: str = "spotpdf-0.6.0/PKG-INFO",
+        extra_source_members: tuple[tuple[str, bytes], ...] = (),
+    ) -> None:
         wheel = self.directory / "spotpdf-0.6.0-py3-none-any.whl"
         with zipfile.ZipFile(wheel, "w") as package:
             package.writestr("spotpdf/__init__.py", b"")
+            if wheel_marker:
+                package.writestr("spotpdf/py.typed", b"")
             package.writestr("spotpdf-0.6.0.dist-info/METADATA", wheel_metadata)
 
         source = self.directory / "spotpdf-0.6.0.tar.gz"
         with tarfile.open(source, "w:gz") as package:
-            for name, data in (
-                ("spotpdf-0.6.0/PKG-INFO", sdist_metadata),
+            members = [
+                (source_metadata_path, sdist_metadata),
                 ("spotpdf-0.6.0/src/spotpdf/__init__.py", b""),
-            ):
+            ]
+            if source_marker:
+                members.append((source_marker_path, b""))
+            members.extend(extra_source_members)
+            for name, data in members:
                 info = tarfile.TarInfo(name)
                 info.size = len(data)
                 package.addfile(info, io.BytesIO(data))
@@ -81,6 +97,85 @@ class DistributionCheckTests(unittest.TestCase):
                 message = str(raised.exception)
                 self.assertIn(archive_suffix, message)
                 self.assertIn(f"Project-URL {label!r}", message)
+
+    def test_requires_typing_marker_in_wheel_and_source_archive(self) -> None:
+        valid = core_metadata(("Security", SECURITY_URL), ("Support", SUPPORT_URL))
+        cases = (
+            (False, True, ".whl"),
+            (True, False, ".tar.gz"),
+        )
+        for wheel_marker, source_marker, archive_suffix in cases:
+            with self.subTest(archive=archive_suffix):
+                self._write_archives(
+                    valid,
+                    valid,
+                    wheel_marker=wheel_marker,
+                    source_marker=source_marker,
+                )
+                with self.assertRaises(SystemExit) as raised:
+                    check_distributions(self.directory)
+                message = str(raised.exception)
+                self.assertIn(archive_suffix, message)
+                self.assertIn("spotpdf/py.typed", message)
+
+    def test_rejects_non_regular_typing_markers(self) -> None:
+        valid = core_metadata(("Security", SECURITY_URL), ("Support", SUPPORT_URL))
+        for archive_kind in ("wheel", "source"):
+            with self.subTest(archive=archive_kind):
+                self._write_archives(valid, valid)
+                if archive_kind == "wheel":
+                    wheel = self.directory / "spotpdf-0.6.0-py3-none-any.whl"
+                    marker = zipfile.ZipInfo("spotpdf/py.typed")
+                    marker.create_system = 3
+                    marker.external_attr = (stat.S_IFLNK | 0o777) << 16
+                    with zipfile.ZipFile(wheel, "w") as package:
+                        package.writestr("spotpdf/__init__.py", b"")
+                        package.writestr(marker, b"target")
+                        package.writestr("spotpdf-0.6.0.dist-info/METADATA", valid)
+                else:
+                    source = self.directory / "spotpdf-0.6.0.tar.gz"
+                    with tarfile.open(source, "w:gz") as package:
+                        for name, data in (
+                            ("spotpdf-0.6.0/PKG-INFO", valid),
+                            ("spotpdf-0.6.0/src/spotpdf/__init__.py", b""),
+                        ):
+                            info = tarfile.TarInfo(name)
+                            info.size = len(data)
+                            package.addfile(info, io.BytesIO(data))
+                        marker = tarfile.TarInfo("spotpdf-0.6.0/src/spotpdf/py.typed")
+                        marker.type = tarfile.SYMTYPE
+                        marker.linkname = "target"
+                        package.addfile(marker)
+
+                with self.assertRaisesRegex(SystemExit, "py[.]typed is not"):
+                    check_distributions(self.directory)
+
+    def test_source_marker_must_match_the_archive_root(self) -> None:
+        valid = core_metadata(("Security", SECURITY_URL), ("Support", SUPPORT_URL))
+        self._write_archives(
+            valid,
+            valid,
+            source_marker_path="spotpdf-9.9.9/src/spotpdf/py.typed",
+        )
+
+        with self.assertRaisesRegex(SystemExit, "outside canonical root"):
+            check_distributions(self.directory)
+
+    def test_source_metadata_and_all_members_must_share_the_archive_root(self) -> None:
+        valid = core_metadata(("Security", SECURITY_URL), ("Support", SUPPORT_URL))
+        cases = (
+            {
+                "source_metadata_path": "different-root/PKG-INFO",
+            },
+            {
+                "extra_source_members": (("different-root/README.md", b"foreign"),),
+            },
+        )
+        for options in cases:
+            with self.subTest(options=options):
+                self._write_archives(valid, valid, **options)
+                with self.assertRaisesRegex(SystemExit, "outside canonical root"):
+                    check_distributions(self.directory)
 
     def test_rejects_duplicate_canonical_project_url(self) -> None:
         duplicated = core_metadata(

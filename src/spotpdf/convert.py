@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from os import PathLike
 from pathlib import Path
 from typing import Any
 
@@ -26,8 +27,8 @@ from .scan import validate_document_for_changes
 
 
 def convert_spot_to_cmyk(
-    input_path: Path,
-    output_path: Path,
+    input_path: str | PathLike[str],
+    output_path: str | PathLike[str],
     spot: str,
     cmyk: Sequence[object],
     *,
@@ -36,6 +37,8 @@ def convert_spot_to_cmyk(
 ) -> ConversionResult:
     """Replace supported Separation paint with the requested explicit CMYK recipe."""
 
+    input_path = Path(input_path)
+    output_path = Path(output_path)
     limits = require_processing_limits(limits)
     percentages = validate_cmyk_percentages(cmyk)
     normalized = normalized_cmyk(percentages)

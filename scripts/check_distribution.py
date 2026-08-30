@@ -20,6 +20,7 @@ REQUIRED_PROJECT_URLS = {
     "Security": "https://github.com/Hyperrick/spotpdf/security/policy",
     "Support": "https://github.com/Hyperrick/spotpdf/blob/main/SUPPORT.md",
 }
+WHEEL_TYPING_MARKER = PurePosixPath("spotpdf/py.typed")
 
 
 def archive_members(archive: Path) -> list[str]:
@@ -58,6 +59,17 @@ def _is_core_metadata_path(member: str, expected_name: str) -> bool:
     return True
 
 
+def _source_archive_root(archive: Path) -> PurePosixPath:
+    """Return the one canonical top-level directory for a source archive."""
+
+    if not archive.name.endswith(".tar.gz"):
+        raise ValueError(f"unsupported source archive name: {archive.name}")
+    root = archive.name.removesuffix(".tar.gz")
+    if not root:
+        raise ValueError(f"source archive has no canonical root: {archive.name}")
+    return PurePosixPath(root)
+
+
 def _zip_member_is_regular(info: zipfile.ZipInfo) -> bool:
     if info.is_dir() or info.flag_bits & 0x1:
         return False
@@ -92,7 +104,21 @@ def archive_core_metadata(archive: Path, members: list[str]) -> bytes:
                 )
             return package.read(info)
 
-    candidates = [member for member in members if _is_core_metadata_path(member, expected_name)]
+    source_root = _source_archive_root(archive)
+    foreign_members = [
+        member
+        for member in members
+        if not (parts := PurePosixPath(member).parts) or parts[0] != source_root.name
+    ]
+    if foreign_members:
+        examples = ", ".join(repr(member) for member in foreign_members[:3])
+        raise ValueError(
+            f"source archive contains members outside canonical root {source_root.name!r}: "
+            f"{examples}"
+        )
+
+    expected_metadata = source_root / expected_name
+    candidates = [member for member in members if PurePosixPath(member) == expected_metadata]
     if len(candidates) != 1:
         raise ValueError(
             f"expected exactly one top-level {expected_name} entry, found {len(candidates)}"
@@ -111,6 +137,33 @@ def archive_core_metadata(archive: Path, members: list[str]) -> bytes:
         if extracted is None:
             raise ValueError(f"could not read top-level {expected_name} entry")
         return extracted.read()
+
+
+def typing_marker_failures(archive: Path, members: list[str]) -> list[str]:
+    """Require one regular PEP 561 marker at the package's canonical path."""
+
+    if archive.suffix == ".whl":
+        expected_marker = WHEEL_TYPING_MARKER
+    else:
+        source_root = _source_archive_root(archive)
+        expected_marker = source_root / "src" / "spotpdf" / "py.typed"
+    candidates = [member for member in members if PurePosixPath(member) == expected_marker]
+    if len(candidates) != 1:
+        return [
+            f"{archive.name}: expected exactly one canonical spotpdf/py.typed marker, "
+            f"found {len(candidates)}"
+        ]
+
+    marker = candidates[0]
+    if archive.suffix == ".whl":
+        with zipfile.ZipFile(archive) as package:
+            if not _zip_member_is_regular(package.getinfo(marker)):
+                return [f"{archive.name}: spotpdf/py.typed is not an unencrypted regular file"]
+    else:
+        with tarfile.open(archive, "r:gz") as package:
+            if not package.getmember(marker).isfile():
+                return [f"{archive.name}: spotpdf/py.typed is not a regular file"]
+    return []
 
 
 def normalize_project_url_label(label: str) -> str:
@@ -166,6 +219,7 @@ def check_distributions(directory: Path) -> None:
         try:
             members = archive_members(archive)
             metadata = archive_core_metadata(archive, members)
+            marker_failures = typing_marker_failures(archive, members)
         except (
             KeyError,
             OSError,
@@ -180,11 +234,12 @@ def check_distributions(directory: Path) -> None:
         for member in members:
             if reason := unsafe_reason(member):
                 failures.append(f"{archive.name}: {member}: {reason}")
+        failures.extend(marker_failures)
         failures.extend(project_url_failures(archive, metadata))
     if failures:
         raise SystemExit("distribution validation failed:\n" + "\n".join(failures))
     print(
-        "Distribution contents and canonical project URLs are valid: "
+        "Distribution contents, typing markers, and canonical project URLs are valid: "
         + ", ".join(archive.name for archive in archives)
     )
 

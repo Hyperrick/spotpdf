@@ -41,6 +41,9 @@ spotpdf = "spotpdf.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+spotpdf = ["py.typed"]
+
 [dependency-groups]
 dev = ["markdown-it-py>=4.2,<5", "ruff>=0.12,<1", "setuptools==84.0.0"]
 release = ["readme-renderer[md]>=46,<47", "twine>=7,<8"]

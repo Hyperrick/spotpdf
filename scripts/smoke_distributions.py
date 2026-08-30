@@ -11,6 +11,55 @@ from pathlib import Path
 
 from spotpdf import __version__
 
+INSTALLED_LIBRARY_SMOKE = r"""
+import sys
+from pathlib import Path
+
+import spotpdf
+from spotpdf import BatchRemovalResult, InspectionReport, check_spot, inspect_pdf, remove_all_spots
+
+expected = {
+    "DEFAULT_PROCESSING_LIMITS",
+    "AlternateResult",
+    "BatchRemovalResult",
+    "ColorantRole",
+    "ConversionResult",
+    "InspectionReport",
+    "InvalidPdfError",
+    "NestingLimitExceededError",
+    "ProcessingBudgetExceeded",
+    "ProcessingLimits",
+    "RemovalStats",
+    "RenameResult",
+    "SpotKind",
+    "SpotPdfError",
+    "SpotSummary",
+    "UnsupportedSpotUseError",
+    "__version__",
+    "check_spot",
+    "convert_spot_to_cmyk",
+    "inspect_pdf",
+    "remove_all_spots",
+    "remove_spot",
+    "rename_spot",
+    "set_alternate_cmyk",
+}
+if set(spotpdf.__all__) != expected or len(spotpdf.__all__) != len(expected):
+    raise SystemExit("installed package has an unexpected public API")
+if any(not hasattr(spotpdf, name) for name in expected):
+    raise SystemExit("installed package is missing a public API object")
+if not Path(spotpdf.__file__).with_name("py.typed").is_file():
+    raise SystemExit("installed package is missing py.typed")
+
+source, output = sys.argv[1:]
+report = inspect_pdf(source)
+if not isinstance(report, InspectionReport) or not check_spot(source, "Varnish"):
+    raise SystemExit("installed library inventory failed")
+result = remove_all_spots(source, output)
+if not isinstance(result, BatchRemovalResult) or check_spot(output, "Varnish"):
+    raise SystemExit("installed library mutation failed")
+"""
+
 
 def run(command: list[str], *, expected_exit: int = 0) -> subprocess.CompletedProcess[str]:
     """Run one smoke-test command and surface captured output on failure."""
@@ -74,12 +123,22 @@ def smoke_archive(archive: Path) -> None:
         run(["uv", "pip", "install", "--python", str(python), str(archive.resolve())])
 
         source = root / "input.pdf"
+        library_output = root / "library-output.pdf"
         alternate = root / "alternate.pdf"
         renamed = root / "renamed.pdf"
         converted = root / "converted.pdf"
         output = root / "output.pdf"
         generator = Path(__file__).parents[1] / "examples" / "create_demo_pdf.py"
         run([sys.executable, str(generator), str(source)])
+        run(
+            [
+                str(python),
+                "-c",
+                INSTALLED_LIBRARY_SMOKE,
+                str(source),
+                str(library_output),
+            ]
+        )
         version = run([str(executable), "--version"])
         before = run([str(executable), "list", str(source)])
         before_json = run([str(executable), "--format", "json", "list", str(source)])
