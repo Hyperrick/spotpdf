@@ -12,9 +12,10 @@ GitHub assets.
    project version in `uv.lock` matches.
 3. Move the release notes from `Unreleased` to a dated `X.Y.Z` section and
    update the comparison links.
-4. Update both stable install commands and every stable-version statement in
-   `README.md` to `vX.Y.Z`, remove obsolete development-only release claims,
-   and update the bug-report version placeholder.
+4. Update both stable install commands to the `vX.Y.Z` Git tag. Update stable
+   prose, the example `spotpdf_version` values in `README.md` and
+   `docs/json-output.md`, and the bug-report version placeholder to `X.Y.Z`
+   without the tag's `v`; remove obsolete development-only release claims.
 5. Regenerate the synthetic visuals and run every local gate:
 
    ```bash

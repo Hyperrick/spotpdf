@@ -9,7 +9,12 @@ import pikepdf
 from .colors import parse_color_space, pdf_name, resolve_color_space
 from .inventory_graph import walk_reachable
 from .inventory_usage import InspectionMetrics
-from .model import InspectionReport, InvalidPdfError, NameDependencyKind, SpotKind
+from .model import (
+    InspectionReport,
+    NameDependencyKind,
+    NestingLimitExceededError,
+    SpotKind,
+)
 from .objects import ObjectKey, ObjectTracker, object_key
 from .rename_hazards import target_name_hazards
 from .scan import MAX_FORM_NESTING
@@ -236,7 +241,7 @@ class _ResourceHazardScanner:
                 continue
             next_depth = form_depth + 1
             if next_depth > MAX_FORM_NESTING:
-                raise InvalidPdfError(
+                raise NestingLimitExceededError(
                     f"{context}: Form nesting exceeds the supported limit of {MAX_FORM_NESTING}"
                 )
             form_resources = xobject.get(pikepdf.Name.Resources, resources)

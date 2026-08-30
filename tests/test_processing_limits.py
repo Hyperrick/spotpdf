@@ -438,7 +438,7 @@ class ProcessingLimitsTests(unittest.TestCase):
             with self.subTest(value=value), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit) as raised:
                     parser.parse_args(["list", "input.pdf", "--max-pages", value])
-                self.assertEqual(raised.exception.code, 2)
+                self.assertEqual(raised.exception.code, 64)
 
         source = self._make_spot_pdf(pages=2)
         stdout = io.StringIO()

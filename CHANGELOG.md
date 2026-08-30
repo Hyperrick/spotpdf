@@ -5,6 +5,32 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Schema-versioned JSON output for all six input-processing commands through
+  `--format json`, with one deterministic command-specific result on stdout or
+  one classified error on stderr.
+- Stable machine error codes for usage, budgets, unsupported spot semantics,
+  validation, PDF parsing, I/O, invalid values, invariant failures, and nesting
+  limits. Budget failures include the metric, public field, observed value,
+  limit, and matching CLI option.
+- A normative JSON contract with Enfocus Switch, shell, and CI recipes plus
+  subprocess coverage for every command, empty results, Unicode and controls,
+  parser failures, native decode failures, and output atomicity.
+
+### Changed
+
+- Invalid command-line arguments now exit with `64`, leaving exit `2`
+  exclusively for a successful `check` result whose requested name is present.
+
+### Compatibility
+
+- Human-readable text remains the default; successful command output and
+  runtime-error wording remain unchanged. Help now documents `--format`, usage
+  errors move from exit `2` to `64`, successful mutations remain exit `0`, and
+  `check` remains exit `0` for absent and `2` for present. Help and version
+  output remain text in JSON mode.
+
 ## [0.5.0] - 2026-08-30
 
 spotpdf 0.5.0 adds fail-closed conversion of one supported named

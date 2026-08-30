@@ -24,7 +24,7 @@ from .limits import DEFAULT_PROCESSING_LIMITS, ProcessingLimits, require_process
 from .model import (
     BatchRemovalResult,
     InspectionReport,
-    InvalidPdfError,
+    NestingLimitExceededError,
     RemovalStats,
     SpotPdfError,
     UnsupportedSpotUseError,
@@ -266,7 +266,7 @@ def _process_form(
     form_depth: int,
 ) -> None:
     if form_depth > MAX_FORM_NESTING:
-        raise InvalidPdfError(
+        raise NestingLimitExceededError(
             f"{parent_label}: Form nesting exceeds the supported limit of {MAX_FORM_NESTING}"
         )
     form_key = object_key(form)

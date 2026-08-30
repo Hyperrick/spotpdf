@@ -113,7 +113,7 @@ and page `/SeparationInfo` declarations:
 spotpdf list input.pdf
 ```
 
-Example output from the synthetic demo:
+Default text output from the synthetic demo:
 
 ```text
 NAME             ROLE  KIND         PAGES  PAINT OPS  STATUS
@@ -121,6 +121,29 @@ CutContour       spot  Separation   1      2          painted
 Personalization  spot  Separation   1      1          painted
 Varnish          spot  Separation   1      1          painted
 ```
+
+### JSON automation (unreleased)
+
+> [!NOTE]
+> `--format json` and the distinct usage-error exit code `64` are available on
+> the current development branch. They are not included in stable v0.5.0.
+
+Every input-processing command can emit exactly one schema-versioned JSON
+object. Text remains the default:
+
+```bash
+spotpdf --format json list input.pdf
+```
+
+```json
+{"command":"list","exit_code":0,"ok":true,"result":{"colorant_count":1,"colorants":[{"contexts":["painted"],"kinds":["Separation"],"name":"Varnish","pages":[1],"paint_operations":1,"roles":["spot"]}],"input":"input.pdf"},"schema_version":"spotpdf.cli/v1","spotpdf_version":"0.5.0"}
+```
+
+Successful results go to stdout. Runtime errors and parser errors after a valid
+`--format json` selection produce one JSON object on stderr. See
+[JSON output and automation](docs/json-output.md) for the complete result
+fields, stable error codes, Enfocus Switch setup, CI examples, and
+compatibility rules.
 
 `ROLE` distinguishes `spot`, `process`, `all`, and `none`. For NChannel color
 spaces, arbitrary names listed in `/Process /Components` are process channels,
@@ -183,7 +206,7 @@ unchanged. This is a composite-preview update, not conversion to process CMYK.
 The initial supported subset rejects any target-related DeviceN/NChannel use
 instead of guessing at multi-ink semantics. Values are stored with PDF number
 precision, so values extremely close to an endpoint can round to 0 or 100.
-The success message reports the values actually stored.
+The default text output and JSON result report the values actually stored.
 
 Convert one supported spot plate to an explicit process recipe:
 
@@ -287,11 +310,20 @@ configuration, and limitations are in the
 | Code | Meaning |
 | ---: | --- |
 | `0` | The command completed; for `check`, the name is absent. |
-| `1` | The PDF could not be processed safely or exceeded a budget. No output was published. |
-| `2` | `check` found the requested name, or command-line arguments were invalid. |
+| `1` | Processing, validation, budget enforcement, or status-stream I/O failed. |
+| `2` | `check` found the requested name. The query itself completed successfully. |
+| `64` | Command-line arguments or option values were invalid. |
 
 Because “present” is an intentional `check` result, shell scripts should handle
-exit code `2` explicitly.
+exit code `2` explicitly. JSON does not change exit semantics: a present result
+has `ok: true`, `exit_code: 2`, and `result.present: true`. Stable v0.5.0 still
+uses exit `2` for argument errors; the unambiguous exit `64` starts with the
+next release.
+
+The “no output published” guarantee applies to PDF processing failures. If a
+caller closes stdout or stderr while a successful mutation is reporting its
+status, the already verified PDF can exist even though the status transport
+returns an I/O failure; see the JSON stream contract for handling guidance.
 
 ## Supported scope
 
@@ -349,8 +381,9 @@ uv run spotpdf remove tmp/pdfs/demo/input.pdf --all \
 uv run spotpdf list tmp/pdfs/demo/output.pdf
 ```
 
-The final command should print `No reachable named colorants found.` To render PNGs
-like the README images, install Poppler and use `pdftoppm`:
+With the default text format, the final command should print
+`No reachable named colorants found.` To render PNGs like the README images,
+install Poppler and use `pdftoppm`:
 
 ```bash
 mkdir -p tmp/images
@@ -404,15 +437,16 @@ Ghostscript `tiffsep`.
 ## Roadmap
 
 The public beta intentionally keeps plate aliasing, preview changes, explicit
-process conversion, and paint removal as separate operations. Future work will
-expand only those PDF constructs that can retain the same fail-closed and
-post-save verification guarantees; see the open GitHub issues for the current
-priorities.
+process conversion, and paint removal as separate operations. Current
+priorities are mutation dry runs, atomic multi-spot recipes, and simpler
+package distribution. New PDF constructs are added only when they can retain
+the same fail-closed and post-save verification guarantees.
 
 ## Project policy
 
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
+- [JSON output and automation](docs/json-output.md)
 - [Processing budgets](docs/processing-budgets.md)
 - [Public corpus and RIP checks](docs/public-corpus.md)
 - [Release process and artifact verification](docs/releasing.md)

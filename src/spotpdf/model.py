@@ -20,6 +20,10 @@ class InvalidPdfError(SpotPdfError):
     """Raised when an input is unsafe or cannot be parsed strictly."""
 
 
+class NestingLimitExceededError(InvalidPdfError):
+    """Raised when recursive PDF structures exceed a fixed safety limit."""
+
+
 class UnsupportedSpotUseError(SpotPdfError):
     """Raised when changing a target would require unsupported semantics."""
 

@@ -339,9 +339,9 @@ class SpotPdfTests(unittest.TestCase):
     def test_remove_parser_requires_exactly_one_selection_mode(self) -> None:
         parser = build_parser()
         with contextlib.redirect_stderr(io.StringIO()):
-            with self.assertRaises(SystemExit):
+            with self.assertRaises(SystemExit) as missing:
                 parser.parse_args(["remove", "input.pdf", "-o", "output.pdf"])
-            with self.assertRaises(SystemExit):
+            with self.assertRaises(SystemExit) as conflicting:
                 parser.parse_args(
                     [
                         "remove",
@@ -353,6 +353,8 @@ class SpotPdfTests(unittest.TestCase):
                         "output.pdf",
                     ]
                 )
+        self.assertEqual(missing.exception.code, 64)
+        self.assertEqual(conflicting.exception.code, 64)
         args = parser.parse_args(["remove", "input.pdf", "--all", "-o", "output.pdf"])
         self.assertTrue(args.all_spots)
 

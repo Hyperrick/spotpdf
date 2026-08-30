@@ -73,6 +73,22 @@ not store per-job overrides or usage in mutable CLI/module globals. New limits
 must document what they include, what they exclude, when they are checked, and
 which native or operating-system work can occur before the overrun is observed.
 
+## JSON CLI contract changes
+
+Treat `spotpdf.cli/v1` as a public automation API:
+
+- add command fields through explicit serializers, never `dataclasses.asdict()`;
+- keep PDF names and paths exact while sorting every set-derived array;
+- add subprocess tests for exit code, stdout/stderr purity, canonical JSON,
+  Unicode and control characters, and the default text output;
+- document every new result field or stable error code in
+  [JSON output and automation](docs/json-output.md) and `CHANGELOG.md`; and
+- introduce a new schema identifier before removing, renaming, changing the
+  type of, or changing the meaning of an existing field.
+
+Human-readable text remains the default. A JSON change must not weaken the
+same atomic-output and fail-closed guarantees exercised by text mode.
+
 ## PDF fixtures
 
 Tests should build the smallest possible PDF with `pikepdf` inside a temporary

@@ -27,7 +27,7 @@ from .inventory_usage import (
     InspectionMetrics,
     TextSummary,
 )
-from .model import ColorSpaceInfo, InvalidPdfError, SpotKind
+from .model import ColorSpaceInfo, InvalidPdfError, NestingLimitExceededError, SpotKind
 from .objects import anchored_object_key, object_key
 from .scan import MAX_FORM_NESTING
 
@@ -450,7 +450,7 @@ class _ContentInventoryScanner:
         if not eligible:
             return frozenset()
         if form_depth > MAX_FORM_NESTING:
-            raise InvalidPdfError(
+            raise NestingLimitExceededError(
                 f"{parent_label}: Form nesting exceeds the supported limit of {MAX_FORM_NESTING}"
             )
         form_key = object_key(form)
