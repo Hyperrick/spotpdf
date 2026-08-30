@@ -10,9 +10,19 @@ strictly supported named `/Separation` to explicit DeviceCMYK paint, and
 removing supported vector or text spot paint. Pages stay vector-based; the tool
 does not rasterize them.
 
-> [!IMPORTANT]
-> This is a focused beta, not a general PDF preflight engine. Unsupported spot
-> uses stop the whole operation without publishing a partial output.
+## Who it is for — and why it exists
+
+`spotpdf` is for prepress engineers, print-production teams, lettershops, and
+developers building automated PDF workflows. It helps when a job requires a
+repeatable way to inventory named plates, remove supported spot-painted text or
+vector objects, rename a plate, change its composite preview, or convert a known
+`/Separation` recipe to explicit CMYK without rasterizing the page.
+
+Open-source PDF libraries can detect named colorants, but safe object-level
+editing of their actual paint is poorly covered. `spotpdf` exists to turn that
+inspection into deterministic CLI and Python operations with dry runs, JSON
+reports, and validated outputs—without requiring a proprietary desktop
+preflight product.
 
 ## Before and after
 
