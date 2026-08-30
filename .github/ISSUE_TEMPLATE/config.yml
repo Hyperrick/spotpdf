@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Read the support guide
+    url: https://github.com/Hyperrick/spotpdf/blob/main/SUPPORT.md
+    about: Choose the right issue type and learn what diagnostic information to include.
   - name: Report a security vulnerability privately
     url: https://github.com/Hyperrick/spotpdf/security/advisories/new
     about: Do not disclose vulnerabilities or confidential PDFs in a public issue.

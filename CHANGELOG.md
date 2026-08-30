@@ -14,6 +14,10 @@ All notable user-visible changes are documented here. The project follows
 - CodeQL analysis for Python runs on pull requests, `main`, a weekly schedule,
   and manual dispatch with read-only contents plus the required code-scanning
   write permission.
+- A support-routing guide and structured usage-question form distinguish
+  questions, reproducible bugs, feature requests, and private vulnerability
+  reports while keeping confidential PDFs and sensitive output data out of
+  project channels.
 
 ## [0.6.0] - 2026-08-30
 

@@ -5,6 +5,8 @@ Thank you for helping make PDF spot-color processing safer and easier to audit.
 ## Before opening an issue
 
 - Search existing issues.
+- Use the route described in [SUPPORT.md](SUPPORT.md) for usage questions, bugs,
+  feature requests, and private security reports.
 - Include the `spotpdf`, Python, and operating-system versions.
 - Include the exact command, stdout, stderr, expected result, and actual result.
 - Say whether the PDF is signed, encrypted, or modification-restricted.

@@ -1,16 +1,17 @@
-name: Bug report
-description: Report incorrect or unsafe spotpdf behavior with a synthetic reproducer.
-title: "Bug: "
-labels: [bug]
+name: Usage question
+description: Ask about installation, commands, compatibility, or an automation workflow.
+title: "Question: "
+labels: [question]
 body:
   - type: markdown
     attributes:
       value: |
-        Do not attach confidential customer or production PDFs. Generate a minimal
-        synthetic reproducer or link to a clearly licensed public fixture.
-        Redact sensitive paths, document names, spot names, and job identifiers
-        from pasted commands or output.
-        Security vulnerabilities must be reported privately through the Security tab.
+        Search existing issues and read the
+        [support guide](https://github.com/Hyperrick/spotpdf/blob/main/SUPPORT.md)
+        first. Do not attach customer, production, confidential, or personal
+        PDFs. Prefer a minimal synthetic reproducer or a clearly licensed
+        public fixture. Redact sensitive paths, document names, spot names, and
+        job identifiers from pasted commands or output.
   - type: input
     id: version
     attributes:
@@ -27,6 +28,13 @@ body:
     validations:
       required: true
   - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Describe the print, prepress, or automation result you need.
+    validations:
+      required: true
+  - type: textarea
     id: command
     attributes:
       label: Exact command and output
@@ -35,24 +43,10 @@ body:
     validations:
       required: true
   - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior
-    validations:
-      required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual behavior
-    validations:
-      required: true
-  - type: textarea
     id: inventory
     attributes:
-      label: spotpdf list output
+      label: Relevant spotpdf list output
       render: text
-    validations:
-      required: true
   - type: dropdown
     id: protected
     attributes:
@@ -65,6 +59,11 @@ body:
         - Unknown
     validations:
       required: true
+  - type: textarea
+    id: research
+    attributes:
+      label: What have you already tried?
+      description: Link relevant documentation or issues and describe the result.
   - type: textarea
     id: reproducer
     attributes:
