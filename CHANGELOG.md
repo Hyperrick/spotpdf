@@ -33,6 +33,10 @@ All notable user-visible changes are documented here. The project follows
 - Wheel and source-archive Core Metadata now expose the canonical Support and
   Security channels. The package gate requires each link exactly once in both
   distributions before publication.
+- Contributor setup now names Poppler's `pdftoppm` prerequisite, provides
+  macOS and Debian/Ubuntu installation commands, adds POSIX and PowerShell
+  verification, and distinguishes Poppler-only documentation/rename rendering
+  from qpdf/Ghostscript convert-render and release-corpus requirements.
 
 ### Security
 
