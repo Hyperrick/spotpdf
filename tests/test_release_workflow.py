@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -10,6 +11,8 @@ class ReleaseWorkflowPolicyTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
         cls.workflow = path.read_text(encoding="utf-8")
+        project_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        cls.project = tomllib.loads(project_path.read_text(encoding="utf-8"))
 
     def _job(self, name: str) -> str:
         match = re.search(
@@ -86,6 +89,26 @@ class ReleaseWorkflowPolicyTests(unittest.TestCase):
         self.assertIn("--json isImmutable", release)
         self.assertIn('if [[ "$immutable" != "true" ]]', release)
         self.assertIn("needs: [package, attest_release, release]", self._job("publish_pypi"))
+
+    def test_package_renders_markdown_before_twine_metadata_check(self) -> None:
+        render_step = self._step("package", "Render PyPI Markdown long descriptions")
+        metadata_step = self._step("package", "Check PyPI metadata")
+        render_command = "python scripts/check_pypi_readme.py dist/*.whl dist/*.tar.gz"
+        twine_command = "twine check --strict dist/*.whl dist/*.tar.gz"
+        self.assertIn(render_command, render_step)
+        self.assertIn(twine_command, metadata_step)
+        self.assertIn("uv run --no-sync", render_step)
+        self.assertIn("uv run --no-sync", metadata_step)
+        package = self._job("package")
+        self.assertLess(
+            package.index("Render PyPI Markdown long descriptions"),
+            package.index("Check PyPI metadata"),
+        )
+
+    def test_release_environment_installs_pypi_markdown_renderer(self) -> None:
+        release = self.project["dependency-groups"]["release"]
+        self.assertIn("readme-renderer[md]>=46,<47", release)
+        self.assertIn("twine>=7,<8", release)
 
 
 if __name__ == "__main__":

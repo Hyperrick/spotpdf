@@ -41,7 +41,7 @@ where = ["src"]
 
 [dependency-groups]
 dev = ["markdown-it-py>=4.2,<5", "ruff>=0.12,<1", "setuptools==84.0.0"]
-release = ["twine>=7,<8"]
+release = ["readme-renderer[md]>=46,<47", "twine>=7,<8"]
 
 [tool.ruff]
 line-length = 100

@@ -57,6 +57,8 @@ before the first release and confirm that the name is still available.
      --output tmp/inventory-benchmark.json
    uv run python scripts/check_public_corpus.py
    uv build --no-build-isolation --out-dir tmp/release-dist
+   uv run --no-sync python scripts/check_pypi_readme.py \
+     tmp/release-dist/*.whl tmp/release-dist/*.tar.gz
    uv run --no-sync twine check --strict \
      tmp/release-dist/*.whl tmp/release-dist/*.tar.gz
    uv run python scripts/check_distribution.py tmp/release-dist
@@ -102,8 +104,11 @@ For a `v*` tag, `.github/workflows/ci.yml`:
    composite renders with Poppler, and checks real plate names with Ghostscript
    `tiffsep`;
 5. builds with the exactly locked setuptools backend;
-6. checks both archives' PyPI metadata and rendered long description with
-   `twine check --strict`, then inspects and installs both distributions;
+6. renders the packaged Markdown long description from both archives with
+   PyPI's `readme-renderer[md]`, requires them to match, and rejects ambiguous
+   or resource-exhausting archive metadata without extracting it; it then runs
+   `twine check --strict` for metadata and warning checks before inspecting and
+   installing both distributions;
 7. permits exactly one wheel, one source archive, and `SHA256SUMS` in the
    GitHub artifact, while a second immutable artifact contains only the wheel
    and source archive for PyPI;
