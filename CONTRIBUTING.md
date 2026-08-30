@@ -21,6 +21,44 @@ Security vulnerabilities belong in a private report as described in
 
 ## Development setup
 
+The documentation-image gate and rename render comparison require Poppler's
+`pdftoppm` executable. Install Poppler before running the pull-request
+checklist. On macOS with Homebrew:
+
+```bash
+brew install poppler
+```
+
+On Debian or Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install --yes poppler-utils
+```
+
+On other platforms, install a current [Poppler](https://poppler.freedesktop.org/)
+build and put `pdftoppm` on `PATH`. In a POSIX shell, confirm the executable is
+discoverable and print its version:
+
+```bash
+command -v pdftoppm
+pdftoppm -v
+```
+
+In Windows PowerShell, run the equivalent checks:
+
+```powershell
+Get-Command pdftoppm -ErrorAction Stop
+pdftoppm -v
+```
+
+Poppler alone covers the documentation-image gate and rename render comparison.
+The convert render/plate comparison also requires qpdf and Ghostscript;
+pull-request CI runs it in the Linux Python 3.13 test job. The maintainer-only
+public corpus gate uses the same three tools and runs for releases. Its complete
+setup remains in
+[docs/public-corpus.md](docs/public-corpus.md#run-locally).
+
 ```bash
 git clone https://github.com/Hyperrick/spotpdf.git
 cd spotpdf
