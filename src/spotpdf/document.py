@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from dataclasses import dataclass, field
+from os import PathLike
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from .content import ContentRewriter
 from .content_support import GraphicsState, operator_name
 from .inspection import enrich_inspection_report
 from .inventory import discover_spot_declarations
+from .limits import DEFAULT_PROCESSING_LIMITS, ProcessingLimits, require_processing_limits
 from .model import (
     BatchRemovalResult,
     InspectionReport,
@@ -53,19 +55,30 @@ class _ProcessedForm:
     changed: bool
 
 
-def inspect_pdf(path: Path) -> InspectionReport:
+def inspect_pdf(
+    path: str | PathLike[str],
+    *,
+    limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
+) -> InspectionReport:
     """Inspect reachable spot declarations and supported paint usage."""
 
-    with open_strict(path) as pdf:
+    limits = require_processing_limits(limits)
+    with open_strict(path, limits=limits) as pdf:
         report = discover_spot_declarations(pdf)
         enrich_inspection_report(pdf, report)
         return report
 
 
-def check_spot(path: Path, spot: str) -> bool:
+def check_spot(
+    path: str | PathLike[str],
+    spot: str,
+    *,
+    limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
+) -> bool:
     """Return whether a name is a reachable spot or legacy Separation target."""
 
-    with open_strict(path) as pdf:
+    limits = require_processing_limits(limits)
+    with open_strict(path, limits=limits) as pdf:
         return spot in discover_spot_declarations(pdf).spots
 
 
@@ -75,6 +88,7 @@ def remove_spot(
     spot: str,
     *,
     force: bool = False,
+    limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
 ) -> RemovalStats:
     """Remove supported uses of one spot color and atomically write a clean PDF."""
 
@@ -83,6 +97,7 @@ def remove_spot(
         output_path,
         requested=frozenset({spot}),
         force=force,
+        limits=require_processing_limits(limits),
     )
     return result.stats
 
@@ -92,10 +107,17 @@ def remove_all_spots(
     output_path: Path,
     *,
     force: bool = False,
+    limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
 ) -> BatchRemovalResult:
     """Remove supported spots while preserving process and special colorants."""
 
-    return _remove_spots(input_path, output_path, requested=None, force=force)
+    return _remove_spots(
+        input_path,
+        output_path,
+        requested=None,
+        force=force,
+        limits=require_processing_limits(limits),
+    )
 
 
 def _remove_spots(
@@ -104,14 +126,15 @@ def _remove_spots(
     *,
     requested: frozenset[str] | None,
     force: bool,
+    limits: ProcessingLimits,
 ) -> BatchRemovalResult:
     """Apply one set-aware rewrite and publish it only after strict validation."""
 
     stats = RemovalStats()
     targets: frozenset[str] = frozenset()
     require_no_all_mode_targets = requested is None
-    with atomic_pdf_output(input_path, output_path, force=force) as output:
-        with open_strict(output.input_path) as pdf:
+    with atomic_pdf_output(input_path, output_path, force=force, limits=limits) as output:
+        with open_strict(output.input_path, limits=limits) as pdf:
             declarations = discover_spot_declarations(pdf)
             declared_names = frozenset(declarations.spots)
             if requested is None:
@@ -325,7 +348,7 @@ def _verify_saved_pdf(
     *,
     require_no_all_mode_targets: bool,
 ) -> None:
-    with open_strict(path) as pdf:
+    with open_strict(path, limits=None) as pdf:
         remaining = discover_spot_declarations(pdf)
         remaining_targets = targets & remaining.spots.keys()
         if remaining_targets:

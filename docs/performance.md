@@ -1,9 +1,11 @@
 # Inventory performance
 
-`spotpdf list` has a deterministic single-pass work contract. Named-color
-declarations are discovered once, removal hazards are attributed in one
-resource traversal, and each reached page or compatible Form content stream is
-interpreted once regardless of how many spot colors the PDF declares.
+`spotpdf list` has a deterministic single-pass semantic-inventory contract.
+Named-color declarations are discovered once, removal hazards are attributed in
+one resource traversal, and each reached page or compatible Form content stream
+is semantically interpreted once regardless of how many spot colors the PDF
+declares. Before that inventory, the processing-budget preflight performs a
+graph traversal, one decoded-byte pass, and one streaming operator-token pass.
 
 ## Reproduce the benchmark
 
@@ -35,22 +37,30 @@ Wall-clock time is reported but is not used as a cross-platform CI gate.
 Separate deterministic unit fixtures double unique page/Form graphs and shared
 hazard aliases from 64 to 128 and reject super-linear traversal growth.
 
+These counters, timings, and `tracemalloc` samples diagnose inventory
+complexity; they are not runtime CPU or memory quotas. The independent
+[processing budgets](processing-budgets.md) provide deterministic source
+refusal points, while native-process isolation remains an operating-system
+concern.
+
 ## Reference measurement
 
 This local before/after measurement used Python 3.13.12, pikepdf 10.12.0, and
 macOS arm64 on 2026-08-30. Each value is the median of nine warmed runs.
 
-| Spots | Version | Stream parses | Time | Python heap peak |
+| Spots | Version | Semantic `parse_content_stream` calls | Time | Python heap peak |
 | ---: | --- | ---: | ---: | ---: |
 | 64 | pre-single-pass baseline | 1,024 | 175 ms | 845,015 B |
-| 64 | single-pass | 16 | 16.5 ms | 836,275 B |
+| 64 | single-pass plus budget preflight | 16 | 19.9 ms | 834,349 B |
 | 128 | pre-single-pass baseline | 2,048 | 570 ms | 1,472,869 B |
-| 128 | single-pass | 16 | 29.1 ms | 1,462,279 B |
+| 128 | single-pass plus budget preflight | 16 | 35.2 ms | 1,458,469 B |
 
 The structural change removes the `colorants × streams` parse multiplier. The
-representative run was about 10 times faster for 64 spots and 18 times faster
+representative run was about 8.8 times faster for 64 spots and 16.2 times faster
 for 128 spots, while measured Python heap peaks stayed effectively unchanged.
-Exact timings vary by machine and PDF compression.
+The current timing includes all three budget-preflight phases; the
+`actual_parse_calls` metric counts only semantic inventory parses. Exact timings
+vary by machine and PDF compression.
 
 The script separately samples timing and `tracemalloc` to avoid tracing
 overhead in the timing result. Its deliberately generous growth guard requires:

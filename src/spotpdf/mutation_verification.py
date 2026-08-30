@@ -88,7 +88,8 @@ def content_fingerprint(pdf: pikepdf.Pdf) -> ContentFingerprint:
         else:
             continue
         identity = key if key[0] == "indirect" else ("direct", min(visit.locations))
-        digest = hashlib.sha256(value.read_bytes()).digest()
+        data = value.get_stream_buffer(pikepdf.StreamDecodeLevel.specialized)
+        digest = hashlib.sha256(data).digest()
         record = records.setdefault(identity, (kind, digest, set()))
         if record[:2] != (kind, digest):
             raise SpotPdfError("one content stream changed while it was being inspected")

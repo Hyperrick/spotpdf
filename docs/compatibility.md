@@ -4,6 +4,11 @@ The guiding rule is conservative: a selected spot is changed only when every
 reachable selected use and exact-name dependency can be handled without
 guessing at PDF semantics.
 
+Processing budgets are independent of this semantic support matrix. Raising a
+limit allows more trusted input work; it does not make an unsupported PDF
+construct eligible for mutation. See [processing budgets](processing-budgets.md)
+for the defaults and exact counters.
+
 ## Supported rename
 
 Rename aliases one exact spot-plate name to another:

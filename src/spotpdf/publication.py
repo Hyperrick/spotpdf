@@ -10,10 +10,18 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from os import PathLike
 from pathlib import Path
 
 import pikepdf
 
+from .budget_preflight import audit_pdf, enforce_input_size
+from .limits import (
+    DEFAULT_PROCESSING_LIMITS,
+    ProcessingBudgetExceeded,
+    ProcessingLimits,
+    require_processing_limits,
+)
 from .model import InvalidPdfError, SpotPdfError
 
 
@@ -33,10 +41,12 @@ def atomic_pdf_output(
     output_path: Path,
     *,
     force: bool,
+    limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
 ) -> Iterator[AtomicPdfOutput]:
     """Yield a temporary destination and publish it only after successful exit."""
 
-    transaction = _prepare_output(input_path, output_path, force=force)
+    limits = require_processing_limits(limits)
+    transaction = _prepare_output(input_path, output_path, force=force, limits=limits)
     published = False
     try:
         yield transaction
@@ -55,24 +65,52 @@ def atomic_pdf_output(
                     raise
 
 
-def open_strict(path: Path) -> pikepdf.Pdf:
-    """Open a PDF without recovery and reject every parser warning."""
+def open_strict(
+    path: str | PathLike[str],
+    *,
+    limits: ProcessingLimits | None = DEFAULT_PROCESSING_LIMITS,
+) -> pikepdf.Pdf:
+    """Open without recovery, preflight source budgets, and reject warnings."""
+
+    path = Path(path)
+    input_bytes = None
+    if limits is not None:
+        limits = require_processing_limits(limits)
+        input_bytes = enforce_input_size(path, limits)
 
     try:
         pdf = pikepdf.open(
             path,
             attempt_recovery=False,
-            suppress_warnings=False,
+            suppress_warnings=True,
             inherit_page_attributes=True,
         )
     except (pikepdf.PdfError, pikepdf.PasswordError) as error:
         raise InvalidPdfError(f"cannot open PDF safely: {error}") from error
-    syntax_errors = pdf.check_pdf_syntax()
-    warnings = pdf.get_warnings()
-    if syntax_errors or warnings:
+
+    try:
+        _reject_syntax_findings(pdf.get_warnings())
+        if limits is not None and input_bytes is not None:
+            audit_pdf(pdf, limits, input_bytes=input_bytes)
+        syntax_errors = pdf.check_pdf_syntax()
+        _reject_syntax_findings([*syntax_errors, *pdf.get_warnings()])
+    except ProcessingBudgetExceeded:
         pdf.close()
-        details = "; ".join(str(item) for item in [*syntax_errors, *warnings])
-        raise InvalidPdfError(f"PDF syntax warnings are not accepted: {details}")
+        raise
+    except InvalidPdfError:
+        pdf.close()
+        raise
+    except (
+        pikepdf.DataDecodingError,
+        pikepdf.DeletedObjectError,
+        pikepdf.PdfError,
+        RuntimeError,
+    ) as error:
+        pdf.close()
+        raise InvalidPdfError(f"cannot validate PDF safely: {error}") from error
+    except Exception:
+        pdf.close()
+        raise
     return pdf
 
 
@@ -89,10 +127,17 @@ def save_pdf(pdf: pikepdf.Pdf, path: Path) -> None:
     )
 
 
-def _prepare_output(input_path: Path, output_path: Path, *, force: bool) -> AtomicPdfOutput:
+def _prepare_output(
+    input_path: Path,
+    output_path: Path,
+    *,
+    force: bool,
+    limits: ProcessingLimits,
+) -> AtomicPdfOutput:
     input_path = input_path.resolve()
     if not input_path.is_file():
         raise InvalidPdfError(f"input PDF does not exist: {input_path}")
+    enforce_input_size(input_path, limits)
     output_path = _output_path_without_final_symlink_resolution(output_path)
     if input_path == output_path:
         raise InvalidPdfError("input and output paths must be different")
@@ -152,3 +197,10 @@ def _output_path_without_final_symlink_resolution(path: Path) -> Path:
     if path.name in {"", ".", ".."}:
         raise InvalidPdfError(f"output must name a PDF file: {path}")
     return path.parent.resolve() / path.name
+
+
+def _reject_syntax_findings(findings: list[object]) -> None:
+    if not findings:
+        return
+    details = "; ".join(str(item) for item in findings)
+    raise InvalidPdfError(f"PDF syntax warnings are not accepted: {details}")

@@ -50,6 +50,25 @@ The inventory benchmark creates 64- and 128-spot PDFs only in a temporary
 directory. Its page/Form parse counts are deterministic; timing and Python heap
 measurements are diagnostic. See [docs/performance.md](docs/performance.md).
 
+## Processing budget changes
+
+Any counter, default, or preflight-order change must include:
+
+- an exact-limit success test and a limit-plus-one failure test;
+- small runtime-generated fixtures, including compressed content when decoded
+  size is involved;
+- atomicity coverage proving every mutating command preserves an existing
+  `--force` destination and leaves no private temporary file;
+- platform-stable assertions on counts and structured errors, not wall-clock,
+  RSS, compression ratios, or allocator behavior; and
+- synchronized README, processing-budget, security, architecture, and changelog
+  documentation.
+
+Keep limit configuration immutable and inject it per public library call. Do
+not store per-job overrides or usage in mutable CLI/module globals. New limits
+must document what they include, what they exclude, when they are checked, and
+which native or operating-system work can occur before the overrun is observed.
+
 ## PDF fixtures
 
 Tests should build the smallest possible PDF with `pikepdf` inside a temporary

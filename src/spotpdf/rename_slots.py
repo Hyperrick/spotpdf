@@ -275,8 +275,8 @@ def object_fingerprint(value: Any) -> tuple[Any, ...]:
         return identity, serialized
     try:
         stream_data = value.read_raw_bytes()
-    except pikepdf.PdfError:
-        stream_data = value.read_bytes()
+    except (pikepdf.DataDecodingError, pikepdf.PdfError):
+        stream_data = value.read_bytes(pikepdf.StreamDecodeLevel.specialized)
     return identity, serialized, stream_data
 
 
@@ -316,9 +316,9 @@ def _semantic_value(
             references[key] = len(references)
     if isinstance(value, pikepdf.Stream):
         try:
-            stream_data = value.read_bytes()
+            stream_data = value.read_bytes(pikepdf.StreamDecodeLevel.specialized)
             stream_mode = "decoded"
-        except pikepdf.PdfError:
+        except (pikepdf.DataDecodingError, pikepdf.PdfError):
             stream_data = value.read_raw_bytes()
             stream_mode = "raw"
         content_fingerprint: bytes | tuple[Any, ...] = hashlib.sha256(stream_data).digest()

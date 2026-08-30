@@ -9,6 +9,7 @@ from pathlib import Path
 import pikepdf
 
 from .alternate import parse_cmyk_percentages, set_alternate_cmyk
+from .cli_limits import add_processing_limit_arguments, processing_limits_from_args
 from .document import check_spot, inspect_pdf, remove_all_spots, remove_spot
 from .model import BatchRemovalResult, RemovalStats, SpotPdfError, __version__
 from .rename import rename_spot
@@ -90,17 +91,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace an existing output after validation",
     )
+    for command_parser in (
+        list_parser,
+        check_parser,
+        remove_parser,
+        rename_parser,
+        alternate_parser,
+    ):
+        add_processing_limit_arguments(command_parser)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        limits = processing_limits_from_args(args)
         if args.command == "list":
-            _print_report(inspect_pdf(args.input))
+            _print_report(inspect_pdf(args.input, limits=limits))
             return 0
         if args.command == "check":
-            present = check_spot(args.input, args.spot)
+            present = check_spot(args.input, args.spot, limits=limits)
             print(f"{args.spot}: {'present' if present else 'absent'}")
             return 2 if present else 0
         if args.command == "remove":
@@ -109,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.input,
                     args.output,
                     force=args.force,
+                    limits=limits,
                 )
                 _print_batch_result(result, args.output)
                 return 0
@@ -117,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.output,
                 args.spot,
                 force=args.force,
+                limits=limits,
             )
             print(f"Removed {args.spot!r}: {_stats_text(stats)}; output: {args.output}")
             return 0
@@ -127,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.spot,
                 args.destination,
                 force=args.force,
+                limits=limits,
             )
             print(
                 f"Renamed {result.source!r} to {result.destination!r} in "
@@ -143,6 +156,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.spot,
                 args.cmyk,
                 force=args.force,
+                limits=limits,
             )
             cmyk = ",".join(f"{value:g}" for value in result.cmyk_percentages)
             print(

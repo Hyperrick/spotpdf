@@ -17,6 +17,7 @@ from .alternate_plan import (
     canonicalize_normalized_cmyk,
 )
 from .inventory import discover_spot_declarations
+from .limits import DEFAULT_PROCESSING_LIMITS, ProcessingLimits, require_processing_limits
 from .model import AlternateResult, InvalidPdfError, SpotPdfError
 from .mutation_verification import (
     ContentFingerprint,
@@ -78,9 +79,11 @@ def set_alternate_cmyk(
     cmyk: Sequence[object],
     *,
     force: bool = False,
+    limits: ProcessingLimits = DEFAULT_PROCESSING_LIMITS,
 ) -> AlternateResult:
     """Replace every matching Separation preview with one linear CMYK fallback."""
 
+    limits = require_processing_limits(limits)
     percentages = validate_cmyk_percentages(cmyk)
     normalized = canonicalize_normalized_cmyk(
         (
@@ -97,8 +100,8 @@ def set_alternate_cmyk(
         normalized[3] * 100,
     )
     result: AlternateResult | None = None
-    with atomic_pdf_output(input_path, output_path, force=force) as output:
-        with open_strict(output.input_path) as pdf:
+    with atomic_pdf_output(input_path, output_path, force=force, limits=limits) as output:
+        with open_strict(output.input_path, limits=limits) as pdf:
             validate_document_for_mutation(pdf)
             before = discover_spot_declarations(pdf)
             plan = build_alternate_plan(pdf, before, spot, normalized)
@@ -162,7 +165,7 @@ def _verify_saved_pdf(
     expected_document: tuple[Any, ...],
     expected_definitions: int,
 ) -> None:
-    with open_strict(path) as pdf:
+    with open_strict(path, limits=None) as pdf:
         report = discover_spot_declarations(pdf)
         if inventory_fingerprint(report) != expected_inventory:
             raise SpotPdfError("saved PDF spot inventory changed unexpectedly")

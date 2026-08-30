@@ -5,6 +5,27 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Immutable public `ProcessingLimits` configuration and five positive-integer
+  CLI overrides for input bytes, pages, reachable graph entries, decoded
+  page/Form content bytes, and content operators.
+- A normative processing-budget guide with exact inclusive counter semantics,
+  library examples, default rationale, and isolation boundaries.
+
+### Safety
+
+- Every input-processing subcommand now performs one fixed-order source budget
+  preflight before analysis or mutation. Any overrun publishes no output and preserves an
+  existing `--force` destination; no created private temporary candidate
+  remains.
+- Reachable graph entries and content operators are counted incrementally rather
+  than materializing complete graph-edge or instruction lists solely for the
+  budget check. Application ceilings remain separate from qpdf safeguards and
+  external CPU/RAM/time isolation.
+- Native qpdf warnings remain collected and fail closed but are no longer
+  duplicated ahead of the CLI's single user-facing error line.
+
 ## [0.4.0] - 2026-08-30
 
 ### Added

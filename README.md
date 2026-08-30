@@ -127,10 +127,12 @@ spotpdf check input.pdf --spot "Varnish"
 `check --spot` answers only for spot/removal candidates, so a process-only
 NChannel component shown by `list` is reported as absent by `check`.
 
-Inventory work is single-pass: removal hazards are attributed in one resource
-scan and every reached page or compatible Form stream is interpreted once, not
-once per declared colorant. Shared Form paint is counted once while every
-compatible calling page is reported. See the reproducible
+Semantic inventory work is single-pass: removal hazards are attributed in one
+resource scan and every reached page or compatible Form stream is interpreted
+once, not once per declared colorant. Shared Form paint is counted once while
+every compatible calling page is reported. A separate budget preflight traverses
+the graph, measures decoded content, and streams operator tokens without
+building another instruction list. See the reproducible
 [64/128-spot benchmark](docs/performance.md).
 
 Rename one spot plate without changing its preview color or paint values:
@@ -200,12 +202,43 @@ written to a temporary file, reopened, parsed, and checked for remaining target
 spots, stale rename references, or an incorrect alternate definition. The same
 atomic publication guarantee applies to `rename` and `set-alternate`.
 
+## Processing budgets
+
+These controls are available on the current development branch and are not
+included in the stable v0.4.0 release.
+
+Every input-processing subcommand applies finite per-input ceilings before
+analysis or mutation:
+
+| Resource | CLI option | Default |
+| --- | --- | ---: |
+| Input file | `--max-input-bytes` | 805,306,368 bytes (768 MiB) |
+| Pages | `--max-pages` | 10,000 |
+| Reachable graph entries | `--max-reachable-objects` | 1,000,000 |
+| Decoded page/Form content | `--max-decoded-content-bytes` | 268,435,456 bytes (256 MiB) |
+| Content operators | `--max-operators` | 5,000,000 |
+
+The boundary is inclusive. Raise an individual positive-integer value only for
+a trusted large job:
+
+```bash
+spotpdf remove large.pdf --all -o clean.pdf \
+  --max-input-bytes 1073741824 --max-pages 20000
+```
+
+An overrun exits without publishing output; `--force` still preserves an
+existing destination. These application ceilings are deterministic refusal
+points, not CPU/RAM quotas or a sandbox. Exact counting semantics, library
+configuration, and limitations are in the
+[processing-budget guide](docs/processing-budgets.md) and
+[security policy](SECURITY.md).
+
 ## Exit codes
 
 | Code | Meaning |
 | ---: | --- |
 | `0` | The command completed; for `check`, the name is absent. |
-| `1` | The PDF could not be processed safely. No output was published. |
+| `1` | The PDF could not be processed safely or exceeded a budget. No output was published. |
 | `2` | `check` found the requested name, or command-line arguments were invalid. |
 
 Because “present” is an intentional `check` result, shell scripts should handle
@@ -278,19 +311,23 @@ pdftoppm -png -r 144 -singlefile \
   tmp/pdfs/demo/output.pdf tmp/images/after
 ```
 
-## How it stays safe
+## Mutation safety model
 
-1. Open without parser recovery and reject syntax warnings.
-2. Inventory reachable color declarations and exact-name dependencies.
-3. Build a complete rename/alternate plan or perform a complete removal dry run
+1. Check input bytes, open without parser recovery, and reject open-time
+   warnings.
+2. Enforce page, graph, decoded-content, and operator budgets; then run qpdf's
+   full syntax check and reject final warnings.
+3. Inventory reachable color declarations and exact-name dependencies.
+4. Build a complete rename/alternate plan or perform a complete removal dry run
    before changing the in-memory document.
-4. Apply only the planned slots or selected paint changes as one operation.
-5. Save beside the destination, reopen strictly, and verify the result.
-6. Atomically replace the destination only after every check succeeds.
+5. Apply only the planned slots or selected paint changes as one operation.
+6. Save beside the destination, reopen strictly, and verify the result.
+7. Atomically replace the destination only after every check succeeds.
 
 This intentionally favors a clear refusal over a PDF that merely looks correct
 in one viewer. See [architecture](docs/architecture.md) for module boundaries and
-the mutation pipeline.
+the mutation pipeline. Publication checks and processing budgets reduce risk;
+they do not make the process a sandbox.
 
 ## Development
 
@@ -312,11 +349,9 @@ Ghostscript `tiffsep`.
 ## Roadmap
 
 The public beta intentionally keeps plate aliasing, preview changes, and
-process conversion as separate operations. Planned follow-up work includes:
+process conversion as separate operations. The next planned capability is:
 
-- converting a strictly supported Separation subset to explicit DeviceCMYK;
-- single-pass inventory for documents containing many spot colors;
-- configurable processing budgets for hostile or multi-tenant automation.
+- converting a strictly supported Separation subset to explicit DeviceCMYK.
 
 Changing an alternate color and converting to process CMYK have different print
 semantics from `rename` and will not be hidden behind one ambiguous command.
@@ -325,6 +360,7 @@ semantics from `rename` and will not be hidden behind one ambiguous command.
 
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
+- [Processing budgets](docs/processing-budgets.md)
 - [Public corpus and RIP checks](docs/public-corpus.md)
 - [Release process and artifact verification](docs/releasing.md)
 - [Security policy](SECURITY.md)
