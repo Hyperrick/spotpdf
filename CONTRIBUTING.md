@@ -178,7 +178,9 @@ destinations and repository-relative targets in HTML `href`, `src`, and
 deliberately not accepted. External URLs and URL fragments are outside this
 check's scope, but the file path before a fragment is still validated. The
 package README has a stricter release gate: repository content must use absolute
-URLs bound to the exact release tag so links and images also work on PyPI.
+URLs bound to the exact release tag or a full immutable commit SHA so links and
+images also work on PyPI. Commit pins allow newly added examples to be visible
+before the next release; branch references remain disallowed.
 Contribution, support, security-policy, and release-process routes are the
 deliberate live-policy exceptions.
 

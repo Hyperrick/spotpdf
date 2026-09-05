@@ -133,6 +133,16 @@ class ReleaseReadmeTests(unittest.TestCase):
                     self.tag,
                 )
 
+    def test_accepts_full_immutable_commit_links(self) -> None:
+        commit = "a" * 40
+        text = self._commands() + (
+            f"[Docs](https://github.com/Hyperrick/spotpdf/blob/{commit}/docs/usage.md)\n"
+            f"![Preview](https://raw.githubusercontent.com/Hyperrick/spotpdf/{commit}/docs/preview.png)\n"
+        )
+        self.assertEqual(validate_release_readme(self.path, text, self.tag), "git-tag")
+        with self.assertRaises(ReleaseReadmeError):
+            validate_release_readme(self.path, text.replace(commit, commit[:7]), self.tag)
+
     def test_accepts_tag_bound_project_links_and_images(self) -> None:
         text = self._commands() + (
             "[Docs](https://github.com/Hyperrick/spotpdf/blob/v1.2.3/docs/usage.md)\n"

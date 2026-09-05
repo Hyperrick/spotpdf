@@ -37,7 +37,7 @@ The report also works with `rename`, `set-alternate`, and `convert`. It distingu
 the actual failure from additional findings and clearly labels locations that can
 only be traced to a page or resource. PDFium and Pillow are included with installation;
 rendering runs only when a report is requested. See the
-[diagnostic report guide](https://github.com/Hyperrick/spotpdf/blob/v0.7.1/docs/diagnostic-reports.md) for limits and examples.
+[diagnostic report guide](https://github.com/Hyperrick/spotpdf/blob/36fa8fdbd221740ef32ff59952764cc6c31eb68f/docs/diagnostic-reports.md) for limits and examples.
 
 ### Try a realistic print example
 
@@ -45,11 +45,11 @@ This fictional, two-page English coffee brochure contains real text, vector
 artwork, and two `FOIL_GOLD` spot-color seal images. Removing these images is
 intentionally unsupported: the report locates both seals on their original pages.
 
-<a href="https://github.com/Hyperrick/spotpdf/blob/v0.7.1/docs/report-example/page-location.png"><img src="https://raw.githubusercontent.com/Hyperrick/spotpdf/v0.7.1/docs/report-example/page-location.png" width="560" alt="English coffee brochure with the unsupported gold foil seal precisely highlighted and numbered on the original page"></a>
+<a href="https://github.com/Hyperrick/spotpdf/blob/36fa8fdbd221740ef32ff59952764cc6c31eb68f/docs/report-example/page-location.png"><img src="https://raw.githubusercontent.com/Hyperrick/spotpdf/36fa8fdbd221740ef32ff59952764cc6c31eb68f/docs/report-example/page-location.png" width="560" alt="English coffee brochure with the unsupported gold foil seal precisely highlighted and numbered on the original page"></a>
 
 The finding links the failure to its PDF object and shows an enlarged excerpt:
 
-![Actual HTML report showing the unsupported FOIL_GOLD image, PDF object identity, and enlarged gold seal](https://raw.githubusercontent.com/Hyperrick/spotpdf/v0.7.1/docs/report-example/finding.png)
+![Actual HTML report showing the unsupported FOIL_GOLD image, PDF object identity, and enlarged gold seal](https://raw.githubusercontent.com/Hyperrick/spotpdf/36fa8fdbd221740ef32ff59952764cc6c31eb68f/docs/report-example/finding.png)
 
 Generate the PDF and report from a checkout:
 
@@ -66,7 +66,7 @@ offline. The original PDF stays unchanged. The report explicitly lists any
 unexamined areas; a located object does not imply exhaustive validation.
 
 These are actual browser screenshots, generated from the example rather than
-mockups. See the [example instructions](https://github.com/Hyperrick/spotpdf/blob/v0.7.1/examples/README.md)
+mockups. See the [example instructions](https://github.com/Hyperrick/spotpdf/blob/36fa8fdbd221740ef32ff59952764cc6c31eb68f/examples/README.md)
 for reproduction and screenshot capture. Only the generator and screenshots are
 versioned; no customer PDF is included.
 
