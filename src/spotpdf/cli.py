@@ -35,6 +35,14 @@ from .rename import rename_spot
 def main(argv: list[str] | None = None) -> int:
     raw_argv = sys.argv[1:] if argv is None else argv
     args = build_parser().parse_args(raw_argv)
+    if getattr(args, "report", None) is not None:
+        from .report_cli import run_report
+
+        return run_report(args, _execute)
+    return _execute(args)
+
+
+def _execute(args) -> int:
     output_format = args.format
     try:
         limits = processing_limits_from_args(args)
@@ -106,9 +114,11 @@ def main(argv: list[str] | None = None) -> int:
             emit_convert(args.input, args.output, result, output_format)
             return 0
     except (SpotPdfError, pikepdf.PdfError, OSError, TypeError, ValueError) as error:
+        args._operation_error = error
         emit_runtime_error(args.command, error, output_format)
         return RUNTIME_ERROR_EXIT
     except RecursionError as error:
+        args._operation_error = error
         emit_runtime_error(args.command, error, output_format)
         return RUNTIME_ERROR_EXIT
     return RUNTIME_ERROR_EXIT

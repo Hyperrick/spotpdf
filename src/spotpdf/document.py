@@ -249,41 +249,7 @@ def _process_document(
 ) -> _RemovalContentPlan:
     context = _ProcessingContext(pdf=pdf, targets=targets, apply=apply, stats=stats)
     for page_number, page in enumerate(pdf.pages, start=1):
-        context.page_touched_by_form = False
-        resources = page.Resources
-        resource_identity = anchored_object_key(
-            resources,
-            ("page", page_number, "Resources"),
-        )
-        instructions = pikepdf.parse_content_stream(page)
-        if _contains_inline_image(instructions) and resource_aliases_for_spots(resources, targets):
-            raise UnsupportedSpotUseError(
-                f"page {page_number}: inline images with target spot resources are not supported"
-            )
-        changes_before = _change_counter(stats)
-        result = _process_stream(
-            context,
-            instructions,
-            resources,
-            resource_identity,
-            GraphicsState(),
-            f"page {page_number}",
-        )
-        if (
-            result.changed
-            or context.page_touched_by_form
-            or _change_counter(stats) != changes_before
-        ):
-            stats.pages_changed.add(page_number)
-            if apply and result.changed:
-                if _contains_inline_image(instructions):
-                    raise UnsupportedSpotUseError(
-                        f"page {page_number}: rewriting a stream with inline images "
-                        "is not supported"
-                    )
-                page.obj[pikepdf.Name.Contents] = pdf.make_stream(
-                    pikepdf.unparse_content_stream(result.instructions)
-                )
+        _process_page(context, page, page_number)
 
     _process_uninvoked_forms(context)
 
@@ -322,6 +288,43 @@ def _process_document(
             )
         ),
     )
+
+
+def _process_page(context: _ProcessingContext, page: pikepdf.Page, page_number: int) -> None:
+    """Validate or rewrite one page using the shared operation checks."""
+    pdf, targets, apply, stats = context.pdf, context.targets, context.apply, context.stats
+    context.page_touched_by_form = False
+    resources = page.Resources
+    resource_identity = anchored_object_key(
+        resources,
+        ("page", page_number, "Resources"),
+    )
+    instructions = pikepdf.parse_content_stream(page)
+    if _contains_inline_image(instructions) and resource_aliases_for_spots(resources, targets):
+        raise UnsupportedSpotUseError(
+            f"page {page_number}: inline images with target spot resources are not supported",
+            location=f"page {page_number}",
+        )
+    changes_before = _change_counter(stats)
+    result = _process_stream(
+        context,
+        instructions,
+        resources,
+        resource_identity,
+        GraphicsState(),
+        f"page {page_number}",
+    )
+    if result.changed or context.page_touched_by_form or _change_counter(stats) != changes_before:
+        stats.pages_changed.add(page_number)
+        if apply and result.changed:
+            if _contains_inline_image(instructions):
+                raise UnsupportedSpotUseError(
+                    f"page {page_number}: rewriting a stream with inline images is not supported",
+                    location=f"page {page_number}",
+                )
+            page.obj[pikepdf.Name.Contents] = pdf.make_stream(
+                pikepdf.unparse_content_stream(result.instructions)
+            )
 
 
 def _process_uninvoked_forms(context: _ProcessingContext) -> None:
@@ -440,7 +443,9 @@ def _process_form(
             context.form_change_generation += 1
         return
     if form_key in context.processing_forms:
-        raise UnsupportedSpotUseError(f"{parent_label}: cyclic Form XObjects are not supported")
+        raise UnsupportedSpotUseError(
+            f"{parent_label}: cyclic Form XObjects are not supported", location=parent_label
+        )
 
     context.processing_forms.add(form_key)
     try:
@@ -451,7 +456,8 @@ def _process_form(
         contains_inline_image = _contains_inline_image(instructions)
         if contains_inline_image and resource_aliases_for_spots(resources, context.targets):
             raise UnsupportedSpotUseError(
-                f"{label}: inline images with target spot resources are not supported"
+                f"{label}: inline images with target spot resources are not supported",
+                location=label,
             )
         local_stats = RemovalStats()
         result = _process_stream(
@@ -467,7 +473,8 @@ def _process_form(
         if result.changed:
             if contains_inline_image:
                 raise UnsupportedSpotUseError(
-                    f"{label}: rewriting a stream with inline images is not supported"
+                    f"{label}: rewriting a stream with inline images is not supported",
+                    location=label,
                 )
             context.form_change_generation += 1
         replacement_bytes = (
@@ -493,7 +500,8 @@ def _process_form(
             or previous.stream_changed != result.changed
         ):
             raise UnsupportedSpotUseError(
-                f"{parent_label}: a shared Form requires context-dependent rewriting"
+                f"{parent_label}: a shared Form requires context-dependent rewriting",
+                location=parent_label,
             )
         previous.proposals[signature] = _FormProposal(resource_key, subtree_changed)
         context.page_touched_by_form |= subtree_changed

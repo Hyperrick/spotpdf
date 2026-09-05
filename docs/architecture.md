@@ -263,3 +263,18 @@ the tool does not impose whole-process CPU, memory, time, or temporary-output
 quotas. qpdf's own parser/filter limits are another independent layer. Use
 external process isolation for hostile PDFs as described in
 [SECURITY.md](../SECURITY.md).
+
+
+## Optional visual diagnostics
+
+`diagnostics.py` owns serializable findings and a context-local collection sink.
+Mutation checks still raise by default. A diagnostic pass can collect independent
+structural refusals through the same predicates; content planners attach their
+active instruction directly when raising.
+
+Report responsibilities are split between CLI lifecycle/publication, read-only
+collection, structural location resolution, private-copy instrumentation, PDFium
+rendering, HTML presentation, and subprocess orchestration. The private marked copy
+retains a mapping to the original input's stream IDs and operators; its rewritten
+object numbers are never presented as original identities. Native rendering runs
+only in the bounded report worker. See [diagnostic reports](diagnostic-reports.md).

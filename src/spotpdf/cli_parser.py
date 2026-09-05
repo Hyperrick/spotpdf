@@ -199,6 +199,9 @@ def build_parser() -> argparse.ArgumentParser:
 def _add_mutation_destination(parser: argparse.ArgumentParser) -> None:
     """Require either a published output or a fully verified dry run."""
 
+    from .report_cli import add_report_arguments
+
+    add_report_arguments(parser)
     destination = parser.add_mutually_exclusive_group(required=True)
     destination.add_argument("-o", "--output", type=Path, help="publish the verified output PDF")
     destination.add_argument(

@@ -12,6 +12,7 @@ import pikepdf
 from .alternate_validation import reject_inline_target_definitions, validate_existing_preview
 from .cmyk import NormalizedCmyk, canonical_pdf_number, canonicalize_normalized_cmyk
 from .colors import PROCESS_COLORANTS, SPECIAL_COLORANTS
+from .diagnostics import definition_findings
 from .inventory_graph import walk_reachable
 from .inventory_values import name_or_string, name_value
 from .model import (
@@ -140,16 +141,7 @@ class _PlanBuilder:
     def build(self) -> AlternatePlan:
         self._validate_request()
         for visit in walk_reachable(self.pdf):
-            value = visit.value
-            if not isinstance(value, pikepdf.Array) or not value:
-                continue
-            family = name_or_string(value[0])
-            if family == "Separation":
-                self._inspect_separation(value, visit.locations)
-            elif family == "DeviceN" and devicen_target_mentions(value, frozenset({self.spot})):
-                raise UnsupportedSpotUseError(
-                    f"{min(visit.locations)}: DeviceN use of {self.spot!r} is not supported"
-                )
+            self.inspect_visit(visit)
         reject_inline_target_definitions(self.pdf, self.spot)
         self._validate_coverage()
         return AlternatePlan(
@@ -158,6 +150,22 @@ class _PlanBuilder:
             cmyk=self.cmyk,
             slots=tuple(sorted(self.slots.values(), key=lambda slot: slot.label)),
         )
+
+    def inspect_visit(self, visit) -> None:
+        """Inspect one color-space resource using the operation's exact rules."""
+        value = visit.value
+        if not isinstance(value, pikepdf.Array) or not value:
+            return
+        family = name_or_string(value[0])
+        if family == "Separation":
+            self._inspect_separation(value, visit.locations)
+        elif family == "DeviceN" and devicen_target_mentions(value, frozenset({self.spot})):
+            raise UnsupportedSpotUseError(
+                f"{min(visit.locations)}: DeviceN use of {self.spot!r} is not supported",
+                location=min(visit.locations),
+                pdf_object=value,
+                spots=[self.spot],
+            )
 
     def _validate_request(self) -> None:
         if self.spot in SPECIAL_COLORANTS:
@@ -174,7 +182,13 @@ class _PlanBuilder:
             )
         if SpotKind.DEVICEN in summary.kinds:
             raise UnsupportedSpotUseError(
-                f"DeviceN use of {self.spot!r} is not supported by set-alternate"
+                f"DeviceN use of {self.spot!r} is not supported by set-alternate",
+                findings=definition_findings(
+                    self.report,
+                    self.spot,
+                    SpotKind.DEVICEN,
+                    "DeviceN use is not supported by set-alternate",
+                ),
             )
         if not self._expected_definition_ids():
             raise InvalidPdfError(
@@ -190,7 +204,8 @@ class _PlanBuilder:
         if name_or_string(raw_name) != self.spot:
             if name_field_mentions(raw_name, frozenset({self.spot})):
                 raise UnsupportedSpotUseError(
-                    f"{min(locations)}: malformed Separation name field mentions {self.spot!r}"
+                    f"{min(locations)}: malformed Separation name field mentions {self.spot!r}",
+                    location=min(locations),
                 )
             return
         location = min(locations)
@@ -202,7 +217,8 @@ class _PlanBuilder:
             or not isinstance(value[3], (pikepdf.Dictionary, pikepdf.Stream))
         ):
             raise UnsupportedSpotUseError(
-                f"{location}: malformed Separation array cannot be changed safely"
+                f"{location}: malformed Separation array cannot be changed safely",
+                location=location,
             )
         validate_existing_preview(value[2], value[3], location)
         definition_id = self._definition_id(locations)
@@ -218,7 +234,8 @@ class _PlanBuilder:
             semantic_object_fingerprint(slot.separation) != semantic_object_fingerprint(value)
         ):
             raise UnsupportedSpotUseError(
-                f"{location}: inventory identity maps to conflicting Separation arrays"
+                f"{location}: inventory identity maps to conflicting Separation arrays",
+                location=location,
             )
         slot.locations.update(locations)
 
@@ -233,7 +250,8 @@ class _PlanBuilder:
         ]
         if len(set(matches)) != 1:
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: Separation has no unique inventory identity"
+                f"{min(locations)}: Separation has no unique inventory identity",
+                location=min(locations),
             )
         return matches[0]
 

@@ -26,6 +26,7 @@ from .rename_hazards import (
     normal_appearance_forms,
     subtree_mentions,
 )
+from .rename_pages import inspect_rename_page
 from .rename_request import SUPPORTED_RENAME_DEPENDENCIES, validate_rename_request
 from .rename_slots import (
     MutableNameSlot,
@@ -40,7 +41,6 @@ from .rename_structures import (
     validate_colorants_dictionary,
     validate_mixing_hints,
     validate_process_dictionary,
-    validate_separation_page_group,
 )
 
 
@@ -70,13 +70,7 @@ class _PlanBuilder:
     def build(self) -> RenamePlan:
         validate_rename_request(self.report, self.source, self.destination)
         for visit in walk_reachable(self.pdf):
-            value = visit.value
-            inspect_hazards(value, visit.locations, self.source, self.destination)
-            self._inspect_color_space(value, visit.locations)
-            if visit.page_label is not None:
-                self._inspect_page(value, visit.page_label)
-            self._inspect_annotation(value, visit.locations)
-            self._collect_colorants_candidate(value, visit.locations)
+            self.inspect_visit(visit)
         self._validate_coverage()
         plan = RenamePlan(
             source=self.source,
@@ -90,6 +84,16 @@ class _PlanBuilder:
         )
         plan.verify_invariants()
         return plan
+
+    def inspect_visit(self, visit) -> None:
+        """Inspect one original resource without applying any planned changes."""
+        value = visit.value
+        inspect_hazards(value, visit.locations, self.source, self.destination)
+        self._inspect_color_space(value, visit.locations)
+        if visit.page_label is not None:
+            inspect_rename_page(self, value, visit.page_label)
+        self._inspect_annotation(value, visit.locations)
+        self._collect_colorants_candidate(value, visit.locations)
 
     def _inspect_color_space(self, value: Any, locations: tuple[str, ...]) -> None:
         if not isinstance(value, pikepdf.Array) or not value:
@@ -109,20 +113,23 @@ class _PlanBuilder:
             raw_name, pikepdf.Name
         ):
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: target occurs in a malformed Separation array"
+                f"{min(locations)}: target occurs in a malformed Separation array",
+                location=min(locations),
             )
         if name_value(raw_name) != self.source:
             return
         location = min(locations)
         if len(value) != 4:
             raise UnsupportedSpotUseError(
-                f"{location}: malformed Separation array cannot be renamed safely"
+                f"{location}: malformed Separation array cannot be renamed safely",
+                location=location,
             )
         if subtree_mentions(value[2], frozenset({self.source})) or subtree_mentions(
             value[3], frozenset({self.source})
         ):
             raise UnsupportedSpotUseError(
-                f"{location}: target is nested in its alternate space or tint transform"
+                f"{location}: target is nested in its alternate space or tint transform",
+                location=location,
             )
         identity = self._definition_identity(SpotKind.SEPARATION, locations)
         self.mapped_definitions.add(identity)
@@ -153,7 +160,8 @@ class _PlanBuilder:
                 frozenset({self.source, self.destination}),
             ):
                 raise UnsupportedSpotUseError(
-                    f"{min(locations)}: target occurs in a malformed DeviceN array"
+                    f"{min(locations)}: target occurs in a malformed DeviceN array",
+                    location=min(locations),
                 )
             return
         location = min(locations)
@@ -162,12 +170,16 @@ class _PlanBuilder:
             or not isinstance(components, pikepdf.Array)
             or any(name is None for name in component_names)
         ):
-            raise UnsupportedSpotUseError(f"{location}: malformed DeviceN array")
+            raise UnsupportedSpotUseError(f"{location}: malformed DeviceN array", location=location)
         if not component_names or "All" in component_names:
-            raise UnsupportedSpotUseError(f"{location}: invalid DeviceN component names")
+            raise UnsupportedSpotUseError(
+                f"{location}: invalid DeviceN component names", location=location
+            )
         repeated_names = [name for name in component_names if name != "None"]
         if len(set(repeated_names)) != len(repeated_names):
-            raise UnsupportedSpotUseError(f"{location}: duplicate DeviceN component names")
+            raise UnsupportedSpotUseError(
+                f"{location}: duplicate DeviceN component names", location=location
+            )
 
         if source_indices:
             identity = self._definition_identity(SpotKind.DEVICEN, locations)
@@ -189,14 +201,18 @@ class _PlanBuilder:
             return
         attributes = value[4]
         if not isinstance(attributes, pikepdf.Dictionary):
-            raise UnsupportedSpotUseError(f"{location}: malformed DeviceN attributes")
+            raise UnsupportedSpotUseError(
+                f"{location}: malformed DeviceN attributes", location=location
+            )
         raw_subtype = attributes.get(pikepdf.Name.Subtype, None)
         subtype = name_value(raw_subtype)
         if raw_subtype is not None and subtype not in {"DeviceN", "NChannel"}:
-            raise UnsupportedSpotUseError(f"{location}: unsupported DeviceN subtype {subtype!r}")
+            raise UnsupportedSpotUseError(
+                f"{location}: unsupported DeviceN subtype {subtype!r}", location=location
+            )
         if subtype == "NChannel" and "None" in component_names:
             raise UnsupportedSpotUseError(
-                f"{location}: /None is not allowed in NChannel component names"
+                f"{location}: /None is not allowed in NChannel component names", location=location
             )
         process = self._inspect_process(attributes, tuple(component_names), location)
         validate_colorants_dictionary(
@@ -210,7 +226,8 @@ class _PlanBuilder:
         if (not source_indices or subtype == "NChannel") and not has_individual:
             raise UnsupportedSpotUseError(
                 f"{location}: target-related DeviceN attributes lack a matching "
-                "/Colorants Separation"
+                "/Colorants Separation",
+                location=location,
             )
         self._inspect_mixing_hints(attributes, locations, tuple(component_names))
 
@@ -226,7 +243,8 @@ class _PlanBuilder:
             return None
         if self.source in structure.names:
             raise UnsupportedSpotUseError(
-                f"{location}: source is an NChannel process component, not a spot"
+                f"{location}: source is an NChannel process component, not a spot",
+                location=location,
             )
         return structure
 
@@ -240,7 +258,8 @@ class _PlanBuilder:
             return False
         if not isinstance(colorants, pikepdf.Dictionary):
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: malformed DeviceN /Colorants dictionary"
+                f"{min(locations)}: malformed DeviceN /Colorants dictionary",
+                location=min(locations),
             )
         colorant_locations = tuple(f"{item}[4] /Colorants" for item in locations)
         mismatched = [
@@ -250,13 +269,15 @@ class _PlanBuilder:
         ]
         if mismatched:
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: /Colorants key and nested Separation name do not match"
+                f"{min(locations)}: /Colorants key and nested Separation name do not match",
+                location=min(locations),
             )
         if self.source_name not in colorants:
             return False
         if not is_matching_separation(colorants[self.source_name], self.source):
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: /Colorants key and nested Separation name do not match"
+                f"{min(locations)}: /Colorants key and nested Separation name do not match",
+                location=min(locations),
             )
         dependency_locations = tuple(
             f"{item} {path_name(self.source_name)}" for item in colorant_locations
@@ -291,13 +312,15 @@ class _PlanBuilder:
                 continue
             if not isinstance(dictionary, pikepdf.Dictionary):
                 raise UnsupportedSpotUseError(
-                    f"{min(locations)}: malformed /MixingHints {key} dictionary"
+                    f"{min(locations)}: malformed /MixingHints {key} dictionary",
+                    location=min(locations),
                 )
             if self.source_name not in dictionary:
                 continue
             if self.destination_name == pikepdf.Name.Default:
                 raise UnsupportedSpotUseError(
-                    f"{min(locations)}: /Default has fallback MixingHints semantics"
+                    f"{min(locations)}: /Default has fallback MixingHints semantics",
+                    location=min(locations),
                 )
             field_locations = tuple(
                 f"{item} {key} {path_name(self.source_name)}" for item in base_locations
@@ -314,7 +337,9 @@ class _PlanBuilder:
         if order is None:
             return
         if not isinstance(order, pikepdf.Array) or any(name_value(item) is None for item in order):
-            raise UnsupportedSpotUseError(f"{min(locations)}: malformed /PrintingOrder array")
+            raise UnsupportedSpotUseError(
+                f"{min(locations)}: malformed /PrintingOrder array", location=min(locations)
+            )
         for index, item in enumerate(order):
             if name_value(item) == self.source:
                 order_locations = tuple(
@@ -328,51 +353,6 @@ class _PlanBuilder:
                     dependency_kind=NameDependencyKind.PRINTING_ORDER,
                 )
 
-    def _inspect_page(self, value: Any, page_label: str) -> None:
-        if not isinstance(value, (pikepdf.Dictionary, pikepdf.Stream)):
-            return
-        info = value.get(pikepdf.Name.SeparationInfo, None)
-        if info is None:
-            return
-        if not isinstance(info, pikepdf.Dictionary):
-            raise UnsupportedSpotUseError(f"{page_label}: malformed /SeparationInfo")
-        current = info.get(pikepdf.Name.DeviceColorant, None)
-        current_name = name_or_string(current)
-        color_space = info.get(pikepdf.Name.ColorSpace, None)
-        color_space_contains = _separation_info_contains(color_space, self.source)
-        target_names = frozenset({self.source, self.destination})
-        if current_name is None and name_field_mentions(current, target_names):
-            raise UnsupportedSpotUseError(
-                f"{page_label}: target occurs in malformed /DeviceColorant"
-            )
-        if color_space_contains is False and name_field_mentions(color_space, target_names):
-            raise UnsupportedSpotUseError(
-                f"{page_label}: target occurs in malformed /SeparationInfo /ColorSpace"
-            )
-        if current_name != self.source and not color_space_contains:
-            return
-        if current_name != self.source or color_space_contains is False:
-            raise UnsupportedSpotUseError(
-                f"{page_label}: /SeparationInfo /DeviceColorant and /ColorSpace disagree"
-            )
-        validate_separation_page_group(value, info, page_label)
-        if isinstance(current, pikepdf.String):
-            mode = SlotMode.STRING_VALUE
-        elif isinstance(current, pikepdf.Name):
-            mode = SlotMode.NAME_VALUE
-        else:
-            raise UnsupportedSpotUseError(
-                f"{page_label}: malformed /SeparationInfo /DeviceColorant"
-            )
-        locations = (f"{page_label} /SeparationInfo /DeviceColorant",)
-        self._add_slot(
-            info,
-            pikepdf.Name.DeviceColorant,
-            mode,
-            locations,
-            dependency_kind=NameDependencyKind.SEPARATION_INFO,
-        )
-
     def _inspect_annotation(self, value: Any, locations: tuple[str, ...]) -> None:
         if not isinstance(value, pikepdf.Dictionary):
             return
@@ -380,7 +360,8 @@ class _PlanBuilder:
         if subtype == pikepdf.Name.TrapNet:
             if subtree_mentions(value, frozenset({self.source, self.destination})):
                 raise UnsupportedSpotUseError(
-                    f"{min(locations)}: TrapNet spot dependencies are not supported"
+                    f"{min(locations)}: TrapNet spot dependencies are not supported",
+                    location=min(locations),
                 )
             return
         if subtype != pikepdf.Name.PrinterMark:
@@ -397,7 +378,8 @@ class _PlanBuilder:
                     frozenset({self.source, self.destination}),
                 ):
                     raise UnsupportedSpotUseError(
-                        f"{min(form_locations)}: malformed PrinterMark /Colorants"
+                        f"{min(form_locations)}: malformed PrinterMark /Colorants",
+                        location=min(form_locations),
                     )
                 continue
             colorant_locations = tuple(f"{item} /Colorants" for item in form_locations)
@@ -407,12 +389,14 @@ class _PlanBuilder:
                     frozenset({self.source, self.destination}),
                 ):
                     raise UnsupportedSpotUseError(
-                        f"{min(form_locations)}: unsupported target in PrinterMark /Colorants"
+                        f"{min(form_locations)}: unsupported target in PrinterMark /Colorants",
+                        location=min(form_locations),
                     )
                 continue
             if not is_matching_separation(colorants[self.source_name], self.source):
                 raise UnsupportedSpotUseError(
-                    f"{min(form_locations)}: PrinterMark /Colorants definition is malformed"
+                    f"{min(form_locations)}: PrinterMark /Colorants definition is malformed",
+                    location=min(form_locations),
                 )
             dependency_locations = tuple(
                 f"{item} {path_name(self.source_name)}" for item in colorant_locations
@@ -451,7 +435,8 @@ class _PlanBuilder:
         if unsupported:
             raise UnsupportedSpotUseError(
                 f"{min(unsupported)}: /Colorants name occurs outside supported "
-                "DeviceN or PrinterMark AP/N context"
+                "DeviceN or PrinterMark AP/N context",
+                location=min(unsupported),
             )
         expected_dependencies = {
             (dependency.kind, dependency.owner.label, dependency.location)
@@ -490,7 +475,8 @@ class _PlanBuilder:
         ]
         if len(matches) != 1:
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: color-space definition has no unique inventory identity"
+                f"{min(locations)}: color-space definition has no unique inventory identity",
+                location=min(locations),
             )
         return ("definition", matches[0].object_id)
 
@@ -511,7 +497,8 @@ class _PlanBuilder:
         owners = {dependency.owner.label for dependency in matches}
         if not matches or len(owners) != 1:
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: exact-name dependency has no unique inventory owner"
+                f"{min(locations)}: exact-name dependency has no unique inventory owner",
+                location=min(locations),
             )
         self.mapped_dependencies.update(
             (dependency.kind, dependency.owner.label, dependency.location) for dependency in matches
@@ -564,21 +551,6 @@ class _PlanBuilder:
         if dependency_kind is not None:
             slot.dependency_kinds.add(dependency_kind)
         slot.locations.update(locations)
-
-
-def _separation_info_contains(value: Any, source: str) -> bool | None:
-    """Return source membership, or ``None`` when optional ColorSpace is absent."""
-
-    if value is None:
-        return None
-    if not isinstance(value, pikepdf.Array) or not value:
-        return False
-    family = name_value(value[0])
-    if family == "Separation":
-        return is_matching_separation(value, source)
-    if family == "DeviceN" and len(value) >= 2:
-        return name_array_contains(value[1], source)
-    return False
 
 
 def build_rename_plan(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .colors import PROCESS_COLORANTS, SPECIAL_COLORANTS
+from .diagnostics import Finding
 from .model import (
     ColorantRole,
     InspectionReport,
@@ -67,7 +68,18 @@ def validate_rename_request(
     if blocked:
         kinds = ", ".join(sorted(kind.value for kind in blocked))
         raise UnsupportedSpotUseError(
-            f"source colorant has unsupported exact-name dependencies: {kinds}"
+            f"source colorant has unsupported exact-name dependencies: {kinds}",
+            findings=[
+                Finding(
+                    "unsupported_spot_use",
+                    "Unsupported exact-name dependency: " + d.kind.value,
+                    [source],
+                    d.owner.label,
+                    d.location,
+                )
+                for d in report.dependencies
+                if d.name == source and d.kind in blocked
+            ],
         )
 
 

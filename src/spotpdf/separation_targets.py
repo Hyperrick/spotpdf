@@ -9,6 +9,7 @@ import pikepdf
 
 from .alternate_validation import reject_inline_target_definitions, validate_existing_preview
 from .colors import PROCESS_COLORANTS, SPECIAL_COLORANTS
+from .diagnostics import definition_findings
 from .inventory_graph import walk_reachable
 from .inventory_values import name_or_string, name_value
 from .model import (
@@ -65,7 +66,7 @@ class SeparationTargetSet:
         if len(matches) != 1:
             label = min(locations) if locations else "unknown location"
             raise UnsupportedSpotUseError(
-                f"{label}: target Separation has no unique inventory identity"
+                f"{label}: target Separation has no unique inventory identity", location=label
             )
         return matches.pop()
 
@@ -100,7 +101,8 @@ class _TargetCollector:
                 self._inspect_separation(value, visit.locations)
             elif family == "DeviceN" and devicen_target_mentions(value, frozenset({self.spot})):
                 raise UnsupportedSpotUseError(
-                    f"{min(visit.locations)}: DeviceN use of {self.spot!r} is not supported"
+                    f"{min(visit.locations)}: DeviceN use of {self.spot!r} is not supported",
+                    location=min(visit.locations),
                 )
         reject_inline_target_definitions(self.pdf, self.spot)
         self._validate_coverage()
@@ -130,7 +132,13 @@ class _TargetCollector:
             )
         if SpotKind.DEVICEN in summary.kinds:
             raise UnsupportedSpotUseError(
-                f"DeviceN use of {self.spot!r} is not supported by convert"
+                f"DeviceN use of {self.spot!r} is not supported by convert",
+                findings=definition_findings(
+                    self.report,
+                    self.spot,
+                    SpotKind.DEVICEN,
+                    "DeviceN use is not supported by convert",
+                ),
             )
         if not self._expected_definition_ids():
             raise InvalidPdfError(
@@ -146,13 +154,15 @@ class _TargetCollector:
         if name_or_string(raw_name) != self.spot:
             if name_field_mentions(raw_name, frozenset({self.spot})):
                 raise UnsupportedSpotUseError(
-                    f"{min(locations)}: malformed Separation name field mentions {self.spot!r}"
+                    f"{min(locations)}: malformed Separation name field mentions {self.spot!r}",
+                    location=min(locations),
                 )
             return
         location = min(locations)
         if not _is_complete_target(value, self.spot):
             raise UnsupportedSpotUseError(
-                f"{location}: malformed Separation array cannot be converted safely"
+                f"{location}: malformed Separation array cannot be converted safely",
+                location=location,
             )
         validate_existing_preview(value[2], value[3], location)
         definition_id = self._definition_id(locations)
@@ -168,7 +178,8 @@ class _TargetCollector:
             return
         if draft.original_fingerprint != fingerprint:
             raise UnsupportedSpotUseError(
-                f"{location}: inventory identity maps to conflicting Separation arrays"
+                f"{location}: inventory identity maps to conflicting Separation arrays",
+                location=location,
             )
         draft.locations.update(locations)
 
@@ -183,7 +194,8 @@ class _TargetCollector:
         }
         if len(matches) != 1:
             raise UnsupportedSpotUseError(
-                f"{min(locations)}: Separation has no unique inventory identity"
+                f"{min(locations)}: Separation has no unique inventory identity",
+                location=min(locations),
             )
         return matches.pop()
 

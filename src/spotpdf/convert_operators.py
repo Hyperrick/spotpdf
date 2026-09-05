@@ -47,7 +47,8 @@ def validate_conversion_operator(
     if operator not in STANDARD_CONTENT_OPERATORS and compatibility_depth == 0:
         raise UnsupportedSpotUseError(
             f"{context}: unknown content operator {operator!r} outside a compatibility "
-            "section is not supported"
+            "section is not supported",
+            location=context,
         )
     if operator in _TYPE3_WIDTH_OPERATORS:
         raise InvalidPdfError(

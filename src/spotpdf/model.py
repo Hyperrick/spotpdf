@@ -15,6 +15,34 @@ except PackageNotFoundError:  # pragma: no cover - direct source-tree fallback
 class SpotPdfError(Exception):
     """Base class for user-facing processing failures."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        location: str | None = None,
+        pdf_object: object = None,
+        spots: object = (),
+        findings: object = None,
+        rule: str | None = None,
+    ):
+        super().__init__(message)
+        from .diagnostics import Finding, identity
+
+        self.findings = list(findings or [])
+        if findings is None and (location is not None or pdf_object is not None or spots):
+            self.findings.append(
+                Finding(
+                    "unsupported_spot_use"
+                    if isinstance(self, UnsupportedSpotUseError)
+                    else "validation_error",
+                    message,
+                    sorted(spots),
+                    identity(pdf_object),
+                    location,
+                    rule=rule,
+                )
+            )
+
 
 class InvalidPdfError(SpotPdfError):
     """Raised when an input is unsafe or cannot be parsed strictly."""

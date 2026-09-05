@@ -237,6 +237,8 @@ def emit_runtime_error(command: str, error: BaseException, output_format: Output
     """Render one classified processing failure to stderr."""
 
     code, message, details = _classify_error(error)
+    if getattr(error, "findings", None):
+        details["findings"] = [finding.wire() for finding in error.findings]
     _emit_error(command, RUNTIME_ERROR_EXIT, code, message, details, output_format)
 
 

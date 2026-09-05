@@ -93,7 +93,8 @@ def collect_removal_resource_aliases(
             }
             if key in _DEFAULT_COLOR_SPACES:
                 raise UnsupportedSpotUseError(
-                    f"{min(slot_locations)}: target is a default color-space override"
+                    f"{min(slot_locations)}: target is a default color-space override",
+                    location=min(slot_locations),
                 )
             identity = (*object_key(color_spaces), str(key))
             proposed = RemovalResourceAlias(
@@ -109,7 +110,8 @@ def collect_removal_resource_aliases(
                 or current.original_fingerprint != proposed.original_fingerprint
             ):
                 raise UnsupportedSpotUseError(
-                    f"{min(slot_locations)}: shared resource alias resolves inconsistently"
+                    f"{min(slot_locations)}: shared resource alias resolves inconsistently",
+                    location=min(slot_locations),
                 )
             current.locations.update(slot_locations)
         if context_has_target:
@@ -143,7 +145,8 @@ def _reject_unprocessed_target_form_owners(
         actual = processed_form_resources.get(owner.form_key, frozenset())
         if not actual and expected in target_context_keys:
             raise UnsupportedSpotUseError(
-                f"{owner.location}: uninvoked Form has target spot resources"
+                f"{owner.location}: uninvoked Form has target spot resources",
+                location=owner.location,
             )
         if (
             actual
@@ -151,7 +154,8 @@ def _reject_unprocessed_target_form_owners(
             and (not actual.isdisjoint(target_context_keys) or expected in target_context_keys)
         ):
             raise UnsupportedSpotUseError(
-                f"{owner.location}: a shared Form requires context-dependent rewriting"
+                f"{owner.location}: a shared Form requires context-dependent rewriting",
+                location=owner.location,
             )
 
 
@@ -213,7 +217,8 @@ def _require_complete_location_coverage(
         location = unplanned[0]
         raise UnsupportedSpotUseError(
             f"{location}: target {expected[location].value} is not exclusively a removable "
-            "content-resource alias"
+            "content-resource alias",
+            location=location,
         )
     if not expected or not planned:
         raise UnsupportedSpotUseError(

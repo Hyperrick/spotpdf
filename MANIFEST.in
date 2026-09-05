@@ -5,6 +5,9 @@ include README.md
 include SECURITY.md
 include SUPPORT.md
 include src/spotpdf/py.typed
+include docs/diagnostic-reports.md
+recursive-include docs/report-example *.png *.json
+include examples/README.md
 include docs/architecture.md
 include docs/compatibility.md
 include docs/json-output.md

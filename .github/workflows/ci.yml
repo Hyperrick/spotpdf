@@ -81,6 +81,9 @@ jobs:
       - name: Verify synthetic documentation images
         run: uv run python scripts/create_docs_images.py --check
 
+      - name: Verify report screenshot provenance
+        run: uv run python scripts/create_report_example.py --check
+
   test:
     name: Test / ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}

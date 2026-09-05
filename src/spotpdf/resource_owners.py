@@ -45,7 +45,8 @@ def reject_unapproved_resource_container_owners(
         unexpected = locations - approved[key]
         if unexpected:
             raise UnsupportedSpotUseError(
-                f"{min(unexpected)}: target resource container has a non-content owner"
+                f"{min(unexpected)}: target resource container has a non-content owner",
+                location=min(unexpected),
             )
 
 

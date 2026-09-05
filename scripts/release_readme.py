@@ -185,7 +185,8 @@ def _project_content_errors(
     live_policy = (
         target.attribute == "href" and content.ref == "main" and content.path in LIVE_POLICY_PATHS
     )
-    if content.ref != tag and not live_policy:
+    immutable_commit = re.fullmatch(r"[0-9a-f]{40}", content.ref) is not None
+    if content.ref != tag and not live_policy and not immutable_commit:
         errors.append(
             f"{prefix} project content URL must use {tag}, not {content.ref!r}: {value!r}"
         )

@@ -64,7 +64,8 @@ def reject_unsafe_planned_stream_owners(
         stream_locations = observed[key]
         if not stream_locations:
             raise UnsupportedSpotUseError(
-                f"{write.label}: planned content stream has no reachable owner"
+                f"{write.label}: planned content stream has no reachable owner",
+                location=write.label,
             )
         _reject_unsafe_locations(
             write,
@@ -130,7 +131,8 @@ def _reject_unsafe_ancestor_owners(
         unexpected = observed[key] - approved_locations
         if unexpected:
             raise UnsupportedSpotUseError(
-                f"{min(unexpected)}: planned content owner container has a non-content owner"
+                f"{min(unexpected)}: planned content owner container has a non-content owner",
+                location=min(unexpected),
             )
 
 
@@ -186,7 +188,8 @@ def _reject_unsafe_locations(
     )
     if len(inherited_contexts) > 1 and inherited_contexts != approved_inherited_contexts:
         raise UnsupportedSpotUseError(
-            f"{write.label}: a resource-inheriting Form has multiple owner contexts"
+            f"{write.label}: a resource-inheriting Form has multiple owner contexts",
+            location=write.label,
         )
 
     for location in sorted(external_locations):
@@ -236,7 +239,8 @@ def _raise_owner_error(
     subject: str,
 ) -> None:
     raise UnsupportedSpotUseError(
-        f"{write.label}: planned {subject} is also reachable as {role.value} at {location}"
+        f"{write.label}: planned {subject} is also reachable as {role.value} at {location}",
+        location=location,
     )
 
 

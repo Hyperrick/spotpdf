@@ -293,7 +293,8 @@ def _raise_dependency(hits: frozenset[str], location: str, kind: str) -> None:
     aliases = ", ".join(repr(name) for name in sorted(hits))
     raise UnsupportedSpotUseError(
         f"{location}: removable color-space alias(es) {aliases} are still referenced "
-        f"by an unsupported {kind}"
+        f"by an unsupported {kind}",
+        location=location,
     )
 
 

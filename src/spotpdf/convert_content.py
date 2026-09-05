@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -28,7 +27,9 @@ from .convert_operators import (
     validate_conversion_operator,
 )
 from .convert_state import ConversionGraphicsState
+from .diagnostics import trace_rewrite
 from .model import InvalidPdfError, SpotKind, UnsupportedSpotUseError
+from .numeric_values import finite_number
 
 FormHandler = Callable[[Any, ConversionGraphicsState], bool]
 
@@ -62,6 +63,7 @@ class ConversionContentPlanner:
         self.context = context
         self.form_handler = form_handler
 
+    @trace_rewrite
     def rewrite(
         self,
         instructions: Sequence[Any],
@@ -78,7 +80,8 @@ class ConversionContentPlanner:
         compatibility_depth = 0
         has_inline_image = False
 
-        for item in instructions:
+        for index, item in enumerate(instructions):
+            self.diagnostic_index = index
             operator = operator_name(item)
             replacement: list[Any] | None = None
 
@@ -142,7 +145,8 @@ class ConversionContentPlanner:
                 if state.uses_target:
                     raise UnsupportedSpotUseError(
                         f"{self.context}: compatibility sections under target color "
-                        "are not supported"
+                        "are not supported",
+                        location=self.context,
                     )
                 compatibility_depth += 1
             elif operator == "EX":
@@ -151,7 +155,8 @@ class ConversionContentPlanner:
                 if state.uses_target:
                     raise UnsupportedSpotUseError(
                         f"{self.context}: compatibility sections under target color "
-                        "are not supported"
+                        "are not supported",
+                        location=self.context,
                     )
                 compatibility_depth -= 1
 
@@ -171,7 +176,8 @@ class ConversionContentPlanner:
             raise InvalidPdfError(f"{self.context}: BX without matching EX")
         if changed and has_inline_image:
             raise UnsupportedSpotUseError(
-                f"{self.context}: rewriting a stream with inline images is not supported"
+                f"{self.context}: rewriting a stream with inline images is not supported",
+                location=self.context,
             )
         return StreamConversionResult(
             instructions=tuple(output),
@@ -199,7 +205,8 @@ class ConversionContentPlanner:
             )
         if info.kind is SpotKind.DEVICEN and info.contains(self.spot):
             raise UnsupportedSpotUseError(
-                f"{self.context}: DeviceN use of target spot color is not supported"
+                f"{self.context}: DeviceN use of target spot color is not supported",
+                location=self.context,
             )
         self._reject_target_pattern_space(operands[0])
         channel = state.nonstroking if operator == "cs" else state.stroking
@@ -209,7 +216,8 @@ class ConversionContentPlanner:
             return [item]
         if compatibility_depth:
             raise UnsupportedSpotUseError(
-                f"{self.context}: target color inside a compatibility section is not supported"
+                f"{self.context}: target color inside a compatibility section is not supported",
+                location=self.context,
             )
         self._reject_default_cmyk()
         process_operator = "k" if operator == "cs" else "K"
@@ -229,11 +237,13 @@ class ConversionContentPlanner:
             return [item]
         if compatibility_depth:
             raise UnsupportedSpotUseError(
-                f"{self.context}: target color inside a compatibility section is not supported"
+                f"{self.context}: target color inside a compatibility section is not supported",
+                location=self.context,
             )
         if operator in {"sc", "SC"}:
             raise UnsupportedSpotUseError(
-                f"{self.context}: target Separation requires {operator}n, not {operator}"
+                f"{self.context}: target Separation requires {operator}n, not {operator}",
+                location=self.context,
             )
         self._reject_default_cmyk()
         operands = list(item.operands)
@@ -253,7 +263,7 @@ class ConversionContentPlanner:
         component_counts = {"g": 1, "G": 1, "rg": 3, "RG": 3, "k": 4, "K": 4}
         operands = list(item.operands)
         if len(operands) != component_counts[operator] or any(
-            not self._finite_number(value) for value in operands
+            not finite_number(value) for value in operands
         ):
             raise InvalidPdfError(f"{self.context}: malformed {operator} operator")
         names = {
@@ -285,7 +295,7 @@ class ConversionContentPlanner:
         if (
             len(operands) != 2
             or not isinstance(operands[0], pikepdf.Name)
-            or not self._finite_number(operands[1])
+            or not finite_number(operands[1])
         ):
             raise InvalidPdfError(f"{self.context}: malformed Tf operator")
         fonts = resource_dictionary(self.resources, "/Font")
@@ -359,7 +369,7 @@ class ConversionContentPlanner:
             not isinstance(value, pikepdf.Array)
             or len(value) != 2
             or not isinstance(value[0], pikepdf.Dictionary)
-            or not self._finite_number(value[1])
+            or not finite_number(value[1])
         ):
             raise InvalidPdfError(f"{self.context}: malformed ExtGState /Font")
         subtype = value[0].get(pikepdf.Name.Subtype, None)
@@ -386,13 +396,14 @@ class ConversionContentPlanner:
         )
         if uses_target and state.font_is_type3:
             raise UnsupportedSpotUseError(
-                f"{self.context}: target-colored Type 3 text is not supported"
+                f"{self.context}: target-colored Type 3 text is not supported",
+                location=self.context,
             )
         if uses_target and state.font_name is None:
             raise InvalidPdfError(f"{self.context}: target-colored text has no valid font")
         if uses_target and not state.text_knockout:
             raise UnsupportedSpotUseError(
-                f"{self.context}: non-knockout target text is not supported"
+                f"{self.context}: non-knockout target text is not supported", location=self.context
             )
         count = 0
         if fill and state.nonstroking.target_selected:
@@ -414,23 +425,27 @@ class ConversionContentPlanner:
         alpha = state.stroking_alpha if stroking else state.nonstroking_alpha
         if overprint:
             raise UnsupportedSpotUseError(
-                f"{self.context}: effective {label} overprint on target paint is not supported"
+                f"{self.context}: effective {label} overprint on target paint is not supported",
+                location=self.context,
             )
         if alpha != Decimal(1):
             raise UnsupportedSpotUseError(
-                f"{self.context}: non-opaque {label} target paint is not supported"
+                f"{self.context}: non-opaque {label} target paint is not supported",
+                location=self.context,
             )
         if not state.normal_blend_mode:
             raise UnsupportedSpotUseError(
-                f"{self.context}: non-Normal blend mode on target paint is not supported"
+                f"{self.context}: non-Normal blend mode on target paint is not supported",
+                location=self.context,
             )
         if state.soft_mask_active:
             raise UnsupportedSpotUseError(
-                f"{self.context}: soft-masked target paint is not supported"
+                f"{self.context}: soft-masked target paint is not supported", location=self.context
             )
         if state.transparency_group:
             raise UnsupportedSpotUseError(
-                f"{self.context}: target paint in a transparency group is not supported"
+                f"{self.context}: target paint in a transparency group is not supported",
+                location=self.context,
             )
 
     def _process_xobject(self, item: Any, state: ConversionGraphicsState) -> bool:
@@ -450,20 +465,25 @@ class ConversionContentPlanner:
                 image_space, self.resources
             ):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: spot-color images are not supported"
+                    f"{self.context}: spot-color images are not supported",
+                    location=self.context,
+                    pdf_object=xobject,
+                    rule="spot_image",
                 )
             if bool(xobject.get(pikepdf.Name.ImageMask, False)) and (
                 state.nonstroking.target_selected
             ):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: target-colored image masks are not supported"
+                    f"{self.context}: target-colored image masks are not supported",
+                    location=self.context,
                 )
             return False
         if subtype == "Form" and self.form_handler is not None:
             return self.form_handler(xobject, state.clone())
         if subtype == "Form" or state.uses_target:
             raise UnsupportedSpotUseError(
-                f"{self.context}: unsupported XObject subtype {subtype!r} under target color"
+                f"{self.context}: unsupported XObject subtype {subtype!r} under target color",
+                location=self.context,
             )
         return False
 
@@ -481,7 +501,9 @@ class ConversionContentPlanner:
         if color_space is not None and self.spot in color_object_colorants(
             color_space, self.resources
         ):
-            raise UnsupportedSpotUseError(f"{self.context}: spot-color shadings are not supported")
+            raise UnsupportedSpotUseError(
+                f"{self.context}: spot-color shadings are not supported", location=self.context
+            )
 
     def _reject_target_inline_image(
         self,
@@ -494,7 +516,8 @@ class ConversionContentPlanner:
             and self.spot in color_object_colorants(color_space, self.resources)
         ):
             raise UnsupportedSpotUseError(
-                f"{self.context}: target-colored inline images are not supported"
+                f"{self.context}: target-colored inline images are not supported",
+                location=self.context,
             )
 
     def _validate_non_target_pattern_operands(self, item: Any) -> None:
@@ -516,7 +539,8 @@ class ConversionContentPlanner:
             and pikepdf.Name.DefaultCMYK in color_spaces
         ):
             raise UnsupportedSpotUseError(
-                f"{self.context}: /DefaultCMYK would remap the requested process values"
+                f"{self.context}: /DefaultCMYK would remap the requested process values",
+                location=self.context,
             )
 
     def _reject_target_pattern_space(self, name: pikepdf.Name) -> None:
@@ -528,7 +552,8 @@ class ConversionContentPlanner:
             return
         if self.spot in color_object_colorants(value[1], self.resources):
             raise UnsupportedSpotUseError(
-                f"{self.context}: uncolored patterns based on the target spot are not supported"
+                f"{self.context}: uncolored patterns based on the target spot are not supported",
+                location=self.context,
             )
 
     def _boolean(self, value: Any, name: str) -> bool:
@@ -546,15 +571,6 @@ class ConversionContentPlanner:
         if not number.is_finite() or not Decimal(0) <= number <= Decimal(1):
             raise InvalidPdfError(f"{self.context}: malformed ExtGState /{name}")
         return number
-
-    @staticmethod
-    def _finite_number(value: Any) -> bool:
-        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
-            return False
-        try:
-            return math.isfinite(float(value))
-        except (OverflowError, TypeError, ValueError):
-            return False
 
     def _normal_blend_mode(self, value: Any) -> bool:
         if isinstance(value, pikepdf.Name):

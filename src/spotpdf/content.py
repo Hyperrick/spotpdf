@@ -35,6 +35,7 @@ from .content_support import (
 from .content_support import (
     resource_dictionary as _resource_dictionary,
 )
+from .diagnostics import trace_rewrite
 from .model import (
     ColorSpaceInfo,
     InvalidPdfError,
@@ -70,6 +71,7 @@ class ContentRewriter:
         self.context = context
         self.form_handler = form_handler
 
+    @trace_rewrite
     def rewrite(
         self,
         instructions: Sequence[Any],
@@ -83,11 +85,13 @@ class ContentRewriter:
         index = 0
 
         while index < len(instructions):
+            self.diagnostic_index = index
             item = instructions[index]
             operator = _operator_name(item)
             if operator == "BT":
                 end = _find_text_end(instructions, index)
                 block = instructions[index : end + 1]
+                self.diagnostic_text_start = index
                 block_result, state = self._rewrite_text_block(block, state)
                 output.extend(block_result.instructions)
                 changed |= block_result.changed
@@ -119,11 +123,13 @@ class ContentRewriter:
                 raise InvalidPdfError(f"{self.context}: ET without matching BT")
             elif operator in {"BX", "EX"} and _state_uses_target(state, self.targets):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: compatibility sections under target color are not supported"
+                    f"{self.context}: compatibility sections under target color are not supported",
+                    location=self.context,
                 )
             elif operator == "INLINE IMAGE" and _state_uses_target(state, self.targets):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: target-colored inline images are not supported"
+                    f"{self.context}: target-colored inline images are not supported",
+                    location=self.context,
                 )
 
             output.append(item)
@@ -163,7 +169,8 @@ class ContentRewriter:
                 )
             if info.kind is SpotKind.DEVICEN and info.contains_any(self.targets):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: DeviceN use of target spot colors is not supported"
+                    f"{self.context}: DeviceN use of target spot colors is not supported",
+                    location=self.context,
                 )
             if operator == "cs":
                 state.nonstroking = info
@@ -187,7 +194,8 @@ class ContentRewriter:
             if selected.contains_any(self.targets):
                 if pattern_names:
                     raise UnsupportedSpotUseError(
-                        f"{self.context}: target-colored patterns are not supported"
+                        f"{self.context}: target-colored patterns are not supported",
+                        location=self.context,
                     )
                 return [_instruction(operator, 1)], True
             return [item], True
@@ -220,6 +228,7 @@ class ContentRewriter:
         target_with_remaining_paint = 0
 
         for index, item in enumerate(block):
+            self.diagnostic_index = self.diagnostic_text_start + index
             operator = _operator_name(item)
             _, handled = self._state_instruction(item, state, stack)
             if handled:
@@ -231,12 +240,14 @@ class ContentRewriter:
                 continue
             if state.text_render_mode in CLIP_TEXT_MODES:
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: target-colored clipping text is not supported"
+                    f"{self.context}: target-colored clipping text is not supported",
+                    location=self.context,
                 )
             if action is None:
                 if operator in {"'", '"'}:
                     raise UnsupportedSpotUseError(
-                        f"{self.context}: target-only quote text operators are not supported"
+                        f"{self.context}: target-only quote text operators are not supported",
+                        location=self.context,
                     )
                 actions[index] = None
                 target_only += 1
@@ -248,7 +259,8 @@ class ContentRewriter:
             raise InvalidPdfError(f"{self.context}: unbalanced q/Q inside a text object")
         if target_only and target_with_remaining_paint:
             raise UnsupportedSpotUseError(
-                f"{self.context}: mixed target-only and retained paint in one text object"
+                f"{self.context}: mixed target-only and retained paint in one text object",
+                location=self.context,
             )
         if target_only:
             non_target_shows = sum(
@@ -258,7 +270,8 @@ class ContentRewriter:
             )
             if non_target_shows:
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: mixed target and non-target text requires font metrics"
+                    f"{self.context}: mixed target and non-target text requires font metrics",
+                    location=self.context,
                 )
 
         output: list[Any] = []
@@ -266,6 +279,7 @@ class ContentRewriter:
         stack = []
         changed = False
         for index, item in enumerate(block):
+            self.diagnostic_index = self.diagnostic_text_start + index
             replacement, handled = self._state_instruction(item, state, stack)
             if index in actions:
                 changed = True
@@ -343,19 +357,24 @@ class ContentRewriter:
                 image_space, self.resources, self.targets
             ):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: spot-color images are not supported"
+                    f"{self.context}: spot-color images are not supported",
+                    location=self.context,
+                    pdf_object=xobject,
+                    rule="spot_image",
                 )
             if bool(xobject.get(pikepdf.Name.ImageMask, False)) and (
                 state.nonstroking.contains_any(self.targets)
             ):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: target-colored image masks are not supported"
+                    f"{self.context}: target-colored image masks are not supported",
+                    location=self.context,
                 )
             return
         if subtype == "Form" and self.form_handler is not None:
             if _state_uses_target(state, self.targets):
                 raise UnsupportedSpotUseError(
-                    f"{self.context}: Forms invoked with inherited target color are not supported"
+                    f"{self.context}: Forms invoked with inherited target color are not supported",
+                    location=self.context,
                 )
             self.form_handler(xobject, state.clone())
 
@@ -372,7 +391,9 @@ class ContentRewriter:
         if color_space is not None and _color_object_contains(
             color_space, self.resources, self.targets
         ):
-            raise UnsupportedSpotUseError(f"{self.context}: spot-color shadings are not supported")
+            raise UnsupportedSpotUseError(
+                f"{self.context}: spot-color shadings are not supported", location=self.context
+            )
 
 
 _NO_TARGET = object()
