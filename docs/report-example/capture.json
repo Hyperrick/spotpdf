@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "sha256_inputs": {
+    "examples/create_report_demo.py": "0c1cbc2cc8e5b1b398cc83100120ca0cc367eb14f0537242ef1c6af34b7644a1",
+    "examples/report_demo/__init__.py": "a7ef127f3be74732fdf14f4d0c4c1069b2a2effb7b323624c3dfa9aec478badd",
+    "examples/report_demo/brochure.py": "6f43cab7df8d9ec92295e907918261e382488986f791e3d540ebc5f26b97f488",
+    "examples/report_demo/seals.py": "78328b9d2b28ccea5094bd5003dcc1ee1495b9faaedd802f98890a33032c7dc6",
+    "src/spotpdf/report_cli.py": "66a9ba8a5c82a25582a819a3ac8d3ae771761c4f4cbbe5876b5428df23dc7def",
+    "src/spotpdf/report_collect.py": "1865f39008a4a334a812fa63ed88b54aca90c6c7d7618f5b70b1e5b9f66addd0",
+    "src/spotpdf/report_html.py": "88e70669281e222bf592f4d3fbb1f7c69f91b6edec0d08985da1c73e98c3937e",
+    "src/spotpdf/report_locations.py": "e6636b88bcb937c1ce7f494ef2000cc9e34616905d76f809b164781af4ec9458",
+    "src/spotpdf/report_plan_checks.py": "31b5eee67d8a9b013e5f3a5336f8d49709a1d5c3642aa3ce7f3f46f660a73667",
+    "src/spotpdf/report_render.py": "594df50ca4955dbdd92cb9854c84f92ea3097c47870d5d91b996128674c39bf7",
+    "src/spotpdf/report_trace.py": "d9cb74b257f069c5705a6310629dc6a8d3bd500530ab1d0f4d6eb13ba87943f3",
+    "src/spotpdf/report_worker.py": "ab9f3dad864d501bf3ff7d141c05fe4b2b0de6f86a92f512e4deacc4c414a604",
+    "src/spotpdf/diagnostics.py": "ba38985c8c6cc47060f85fc68ab1e659f795f0214a8d6af2388cef593b8862fd",
+    "scripts/create_report_example.py": "b8fea9e5ac0176f71f694d293cf1fff5b185acd627a49186044e5c0d09c32014",
+    "pyproject.toml": "7d85e0e391f395bd1cc0d5e1243ea4a367c97851f379f3db29e487590261b0a2",
+    "uv.lock": "7271b5554a3ba5eb828541ea440ec54d27f62c930adead32e85417a8a1d91c43"
+  },
+  "screenshots": {
+    "finding.png": {
+      "sha256": "8c00979fe8ef11fac58b4cde5f2b5afe25520a7705934466a28ef64debb71026",
+      "size": [
+        992,
+        582
+      ]
+    },
+    "page-location.png": {
+      "sha256": "3c36587d1abab10e0ef12694c7e1f92e69adce7210b872eb576eda9a62e2aa67",
+      "size": [
+        992,
+        1309
+      ]
+    }
+  },
+  "playwright_cli": "0.1.19",
+  "pdfium": "5.13.0",
+  "viewport": [
+    1040,
+    1100
+  ],
+  "offline": true,
+  "expected_locations": [
+    [
+      1,
+      [
+        434.0,
+        480.0,
+        542.0,
+        588.0
+      ]
+    ],
+    [
+      2,
+      [
+        440.0,
+        104.0,
+        522.0,
+        186.0
+      ]
+    ]
+  ]
+}

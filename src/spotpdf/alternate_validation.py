@@ -31,7 +31,7 @@ def validate_existing_preview(alternate: Any, tint: Any, location: str) -> None:
         stack=frozenset(),
     ):
         raise UnsupportedSpotUseError(
-            f"{location}: malformed or unsupported Separation tint transform"
+            f"{location}: malformed or unsupported Separation tint transform", location=location
         )
 
 
@@ -46,7 +46,8 @@ def reject_inline_target_definitions(pdf: pikepdf.Pdf, spot: str) -> None:
             color_space = instruction.iimage.obj.get(pikepdf.Name.ColorSpace, None)
             if _inline_space_mentions(color_space, names):
                 raise UnsupportedSpotUseError(
-                    f"{label}: inline-image color-space definition mentions {spot!r}"
+                    f"{label}: inline-image color-space definition mentions {spot!r}",
+                    location=label,
                 )
 
 
@@ -59,23 +60,31 @@ def _alternate_component_count(
     if isinstance(value, pikepdf.Name) and family in _DEVICE_COMPONENTS:
         return _DEVICE_COMPONENTS[family]
     if not isinstance(value, pikepdf.Array) or len(value) != 2:
-        raise UnsupportedSpotUseError(f"{location}: unsupported alternate color space")
+        raise UnsupportedSpotUseError(
+            f"{location}: unsupported alternate color space", location=location
+        )
 
     family = name_value(value[0])
     if family in _CIE_COMPONENTS and _valid_cie_space(family, value[1]):
         return _CIE_COMPONENTS[family]
     if family != "ICCBased" or not isinstance(value[1], pikepdf.Stream):
-        raise UnsupportedSpotUseError(f"{location}: malformed alternate color space")
+        raise UnsupportedSpotUseError(
+            f"{location}: malformed alternate color space", location=location
+        )
 
     profile = value[1]
     key = object_key(profile)
     if key in stack or len(stack) >= 16:
-        raise UnsupportedSpotUseError(f"{location}: cyclic ICCBased alternate color space")
+        raise UnsupportedSpotUseError(
+            f"{location}: cyclic ICCBased alternate color space", location=location
+        )
     count = profile.get(pikepdf.Name.N, None)
     if not _plain_int(count) or count not in {1, 3, 4}:
-        raise UnsupportedSpotUseError(f"{location}: malformed ICCBased component count")
+        raise UnsupportedSpotUseError(
+            f"{location}: malformed ICCBased component count", location=location
+        )
     if not _optional_intervals(profile.get(pikepdf.Name.Range, None), count, strict=False):
-        raise UnsupportedSpotUseError(f"{location}: malformed ICCBased range")
+        raise UnsupportedSpotUseError(f"{location}: malformed ICCBased range", location=location)
     fallback = profile.get(pikepdf.Name.Alternate, None)
     if (
         fallback is not None
@@ -86,7 +95,9 @@ def _alternate_component_count(
         )
         != count
     ):
-        raise UnsupportedSpotUseError(f"{location}: ICCBased alternate dimensions disagree")
+        raise UnsupportedSpotUseError(
+            f"{location}: ICCBased alternate dimensions disagree", location=location
+        )
     return count
 
 

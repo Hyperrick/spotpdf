@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Any
 
 import pikepdf
@@ -12,6 +13,7 @@ from .colors import (
     pdf_name,
     resolve_color_space,
 )
+from .diagnostics import Finding, identity, reject
 from .inventory import discover_spot_declarations
 from .inventory_graph import walk_reachable
 from .model import (
@@ -20,7 +22,6 @@ from .model import (
     NameDependencyKind,
     NestingLimitExceededError,
     SpotKind,
-    UnsupportedSpotUseError,
 )
 from .objects import ObjectTracker
 from .rename_hazards import inspect_target_hazards
@@ -80,8 +81,21 @@ def validate_spot_uses_for_removal(
     )
     if devicen_targets:
         names = ", ".join(repr(name) for name in devicen_targets)
-        raise UnsupportedSpotUseError(
-            f"document: reachable DeviceN declarations contain target spot colors: {names}"
+        reject(
+            f"document: reachable DeviceN declarations contain target spot colors: {names}",
+            findings=[
+                Finding(
+                    "unsupported_spot_use",
+                    f"DeviceN definition uses target colorants: {names}",
+                    devicen_targets,
+                    definition.object_id,
+                    location,
+                )
+                for definition in report.definitions.values()
+                if definition.kind is SpotKind.DEVICEN
+                and any(c.name in spots for c in definition.components)
+                for location in definition.locations
+            ],
         )
     preseparated_targets = sorted(
         {
@@ -93,23 +107,86 @@ def validate_spot_uses_for_removal(
     )
     if preseparated_targets:
         names = ", ".join(repr(name) for name in preseparated_targets)
-        raise UnsupportedSpotUseError(
-            f"document: page SeparationInfo metadata contains target colorants: {names}"
+        reject(
+            f"document: page SeparationInfo metadata contains target colorants: {names}",
+            findings=[
+                Finding(
+                    "unsupported_spot_use",
+                    "Unsupported exact-name dependency: " + dependency.kind.value,
+                    [dependency.name],
+                    dependency.owner.label,
+                    dependency.location,
+                )
+                for dependency in report.dependencies
+                if dependency.name in spots
+                and dependency.kind is NameDependencyKind.SEPARATION_INFO
+            ],
         )
     dependency_targets = sorted({dependency.name for dependency in report.dependencies} & spots)
     if dependency_targets:
         names = ", ".join(repr(name) for name in dependency_targets)
-        raise UnsupportedSpotUseError(
-            f"document: exact-name prepress dependencies contain target colorants: {names}"
+        reject(
+            f"document: exact-name prepress dependencies contain target colorants: {names}",
+            findings=[
+                Finding(
+                    "unsupported_spot_use",
+                    "Unsupported exact-name dependency: " + dependency.kind.value,
+                    [dependency.name],
+                    dependency.owner.label,
+                    dependency.location,
+                )
+                for dependency in report.dependencies
+                if dependency.name in spots and True
+            ],
         )
 
     seen_forms = ObjectTracker()
     for page_number, page in enumerate(pdf.pages, start=1):
         annotations = page.obj.get(pikepdf.Name.Annots, None)
-        if annotations is not None and _subtree_contains_spots(annotations, spots, ObjectTracker()):
-            raise UnsupportedSpotUseError(
-                f"page {page_number}: spot color in annotation appearances is not supported"
+        if (
+            annotations is not None
+            and not isinstance(annotations, pikepdf.Array)
+            and _subtree_contains_spots(annotations, spots, ObjectTracker())
+        ):
+            reject(
+                f"page {page_number}: spot color in annotation appearances is not supported",
+                location=f"page {page_number}/Annots",
+                pdf_object=annotations,
+                spots=spots,
             )
+        if isinstance(annotations, pikepdf.Array):
+            for index, annotation in enumerate(annotations):
+                if _subtree_contains_spots(annotation, spots, ObjectTracker()):
+                    location = f"page {page_number}/Annots[{index}]"
+                    occurrence = {
+                        "page": page_number,
+                        "location": location,
+                        "accuracy": "structure",
+                    }
+                    rectangle = (
+                        annotation.get("/Rect")
+                        if isinstance(annotation, (pikepdf.Dictionary, pikepdf.Stream))
+                        else None
+                    )
+                    if isinstance(rectangle, pikepdf.Array) and len(rectangle) == 4:
+                        with suppress(ValueError, TypeError, OverflowError):
+                            occurrence.update(
+                                bbox=[float(v) for v in rectangle], accuracy="surrounding area"
+                            )
+                    reject(
+                        f"page {page_number}: spot color in annotation appearances "
+                        "is not supported",
+                        findings=[
+                            Finding(
+                                "unsupported_spot_use",
+                                "Spot color in annotation appearance is not supported",
+                                sorted(spots),
+                                identity(annotation),
+                                location,
+                                [occurrence],
+                            )
+                        ],
+                    )
         resources = page.obj.get(pikepdf.Name.Resources, pikepdf.Dictionary())
         _validate_resources(resources, spots, f"page {page_number}", seen_forms)
 
@@ -148,11 +225,14 @@ def _validate_resources(
 
     color_spaces = resources.get(pikepdf.Name.ColorSpace, None)
     if isinstance(color_spaces, pikepdf.Dictionary):
-        for value in color_spaces.values():
+        for name, value in color_spaces.items():
             info = parse_color_space(value)
             if info.kind is SpotKind.DEVICEN and info.contains_any(spots):
-                raise UnsupportedSpotUseError(
-                    f"{context}: DeviceN use of target spot colors is not supported"
+                reject(
+                    f"{context}: DeviceN use of target spot colors is not supported",
+                    location=f"{context}/Resources/ColorSpace/{pdf_name(name)}",
+                    pdf_object=value,
+                    spots=spots,
                 )
             if (
                 isinstance(value, pikepdf.Array)
@@ -161,8 +241,11 @@ def _validate_resources(
                 and len(value) > 1
                 and _color_value_contains_spots(value[1], resources, spots)
             ):
-                raise UnsupportedSpotUseError(
-                    f"{context}: uncolored patterns based on target spots are not supported"
+                reject(
+                    f"{context}: uncolored patterns based on target spots are not supported",
+                    location=f"{context}/Resources/ColorSpace/{pdf_name(name)}",
+                    pdf_object=value,
+                    spots=spots,
                 )
 
     for category, label in (
@@ -183,8 +266,11 @@ def _validate_resources(
                     value[pikepdf.Name.ColorSpace], resources, spots
                 )
             if contains_spot:
-                raise UnsupportedSpotUseError(
-                    f"{context}: spot color in {label} {pdf_name(name)!r} is not supported"
+                reject(
+                    f"{context}: spot color in {label} {pdf_name(name)!r} is not supported",
+                    location=f"{context}/Resources{category}/{pdf_name(name)}",
+                    pdf_object=value,
+                    spots=spots,
                 )
 
     fonts = resources.get(pikepdf.Name.Font, None)
@@ -202,8 +288,12 @@ def _validate_resources(
             if subtype == "Type3" and (
                 inherited_target_resources or _subtree_contains_spots(font, spots, ObjectTracker())
             ):
-                raise UnsupportedSpotUseError(
-                    f"{context}: spot color in Type3 font {pdf_name(name)!r} is not supported"
+                reject(
+                    f"{context}: spot color in Type3 font {pdf_name(name)!r} is not supported",
+                    location=f"{context}/Resources/Font/{pdf_name(name)}",
+                    pdf_object=font,
+                    spots=spots,
+                    rule="spot_type3_font",
                 )
 
     ext_gstates = resources.get(pikepdf.Name.ExtGState, None)
@@ -211,8 +301,12 @@ def _validate_resources(
         for name, state in ext_gstates.items():
             soft_mask = state.get(pikepdf.Name.SMask, None)
             if soft_mask is not None and _subtree_contains_spots(soft_mask, spots, ObjectTracker()):
-                raise UnsupportedSpotUseError(
-                    f"{context}: spot color in soft mask {pdf_name(name)!r} is not supported"
+                reject(
+                    f"{context}: spot color in soft mask {pdf_name(name)!r} is not supported",
+                    location=f"{context}/Resources/ExtGState/{pdf_name(name)}",
+                    pdf_object=state,
+                    spots=spots,
+                    rule="spot_soft_mask",
                 )
 
     xobjects = resources.get(pikepdf.Name.XObject, None)
@@ -222,8 +316,12 @@ def _validate_resources(
         subtype = pdf_name(xobject.get(pikepdf.Name.Subtype, pikepdf.Name("/Unknown")))
         if subtype == "Image":
             if _image_subtree_contains_spots(xobject, resources, spots):
-                raise UnsupportedSpotUseError(
-                    f"{context}: spot-color image {pdf_name(name)!r} is not supported"
+                reject(
+                    f"{context}: spot-color image {pdf_name(name)!r} is not supported",
+                    location=f"{context}/Resources/XObject/{pdf_name(name)}",
+                    pdf_object=xobject,
+                    spots=spots,
+                    rule="spot_image",
                 )
             continue
         if subtype != "Form":

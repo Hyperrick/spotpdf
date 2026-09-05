@@ -5,6 +5,16 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Optional `--report` HTML diagnostics for mutation commands and dry runs, with
+  embedded original-page previews, object markers, enlarged excerpts, and a filter.
+- Structured failure provenance and bounded read-only additional diagnostics,
+  including original object/stream identities and repeated Form invocation locations.
+- Atomic report publication, explicit overwrite and size/time limits, and partial
+  technical reports when rendering is unavailable. PDFium and Pillow are installed
+  as runtime dependencies; rendering is only invoked on request.
+
 ## [0.7.1] - 2026-08-30
 
 ### Changed

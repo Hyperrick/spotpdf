@@ -227,13 +227,14 @@ unknown future code as a generic failure while preserving it for diagnostics.
 | --- | --- | --- |
 | `usage_error` | Missing, conflicting, unknown, or invalid CLI arguments | Empty object |
 | `budget_exceeded` | One deterministic processing budget was exceeded | `metric`, `field`, `observed`, `limit`, `option` |
-| `unsupported_spot_use` | The requested mutation reached unsupported spot semantics | Empty object |
-| `validation_error` | Input, requested operation, or publication validation failed | Empty object |
+| `unsupported_spot_use` | The requested mutation reached unsupported spot semantics | Optional `findings` |
+| `validation_error` | Input, requested operation, or publication validation failed | Optional `findings` |
 | `pdf_error` | A native PDF parser error reached the CLI boundary | Empty object |
 | `io_error` | Operating-system I/O failed | Optional numeric `errno` |
 | `invalid_input` | A runtime value failed type or value validation | Empty object |
 | `processing_error` | Another fail-closed processing invariant failed | Empty object |
-| `nesting_limit_exceeded` | PDF nesting exceeded a safe fixed limit | Empty object |
+| `nesting_limit_exceeded` | PDF nesting exceeded a safe fixed limit | Optional `findings` |
+| `report_error` | Operation succeeded but the requested report could not be written | `output_published` |
 
 `validation_error` is intentionally broader than `invalid_pdf`. The current
 Python exception also represents missing source names, reserved requests,
@@ -344,3 +345,30 @@ JSON with a real JSON parser. Do not use `eval`, interpolate values into a
 shell command, or treat an `error.message` as executable text. The JSON
 contract belongs only to the CLI; the Python library continues to expose its
 typed result objects and exceptions directly.
+
+
+## Diagnostic report results
+
+With `--report`, the single JSON envelope additionally includes `report` with
+`path`, `status` (`complete`, `partial`, or `failed`), `gaps` (coverage explanations),
+and `output_published` (whether the operation published its output PDF).
+A partial report is usable and explicitly identifies incomplete coverage.
+
+`error.details.findings` contains available structured provenance. Each finding
+has `code`, `message`, `spots`, nullable `object_id` and `location`, `primary`, an
+optional rule identifier (`rule`, nullable), and `occurrences`. Each occurrence
+contains available source location, one-based page, source stream identity,
+zero-based operator index, Form invocation chain, and localization accuracy.
+A `bbox` is `[left, bottom, right, top]` in original PDF page coordinates; it is
+not a browser pixel rectangle. Unavailable fields are omitted or null. Clients
+must accept additional fields and accuracy values. Structured provenance may also
+be present without requesting HTML, but no additional diagnostic pass runs then.
+
+When an operation fails, its original `error.code`, message, and exit code remain
+primary even if report creation also fails. If only report creation fails after a
+successful operation, the envelope has `ok:false`, `exit_code:1`, and
+`error.code:"report_error"`; `error.details.output_published` states whether an output
+PDF was already created. The original operation `result` is retained in this case
+so callers can account for completed work. No second JSON record is emitted.
+
+See [visual diagnostic reports](diagnostic-reports.md) for coverage and limits.

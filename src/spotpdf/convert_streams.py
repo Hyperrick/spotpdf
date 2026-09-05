@@ -152,12 +152,12 @@ class _StreamPlanBuilder:
         keys = tuple(object_key(stream) for stream in streams)
         if len(set(keys)) != len(keys):
             raise UnsupportedSpotUseError(
-                f"{label}: repeated page content streams cannot be rewritten safely"
+                f"{label}: repeated page content streams cannot be rewritten safely", location=label
             )
         shared = sorted(key for key in keys if len(self.page_stream_usage.get(key, ())) > 1)
         if shared:
             raise UnsupportedSpotUseError(
-                f"{label}: shared page content streams cannot be rewritten safely"
+                f"{label}: shared page content streams cannot be rewritten safely", location=label
             )
         replacement = pikepdf.unparse_content_stream(result.instructions)
         for index, stream in enumerate(streams):
@@ -209,7 +209,9 @@ class _StreamPlanBuilder:
             )
         key = object_key(form)
         if key in self.processing_forms:
-            raise UnsupportedSpotUseError(f"{parent_label}: cyclic Form XObjects are not supported")
+            raise UnsupportedSpotUseError(
+                f"{parent_label}: cyclic Form XObjects are not supported", location=parent_label
+            )
         resources, resource_key = self._form_resources(
             form,
             parent_resources,
@@ -250,7 +252,8 @@ class _StreamPlanBuilder:
                     self.color_operators_rewritten += result.color_operators_rewritten
             elif record.canonical_bytes != replacement or record.changed != result.changed:
                 raise UnsupportedSpotUseError(
-                    f"{parent_label}: a shared Form requires context-dependent rewriting"
+                    f"{parent_label}: a shared Form requires context-dependent rewriting",
+                    location=parent_label,
                 )
             record.proposals[signature] = proposal
             return result.subtree_changed
@@ -302,7 +305,8 @@ class _StreamPlanBuilder:
             if resources is None:
                 if _references_alias(instructions, self.removed_aliases):
                     raise UnsupportedSpotUseError(
-                        f"{label}: inherited target resources have no invocation context"
+                        f"{label}: inherited target resources have no invocation context",
+                        location=label,
                     )
             elif not isinstance(resources, pikepdf.Dictionary):
                 raise InvalidPdfError(f"{label}: malformed /Resources dictionary")
@@ -317,7 +321,7 @@ class _StreamPlanBuilder:
         key = object_key(stream)
         if key[0] != "indirect":
             raise UnsupportedSpotUseError(
-                f"{label}: direct content streams cannot be rewritten safely"
+                f"{label}: direct content streams cannot be rewritten safely", location=label
             )
         original = _stream_bytes(stream, label)
         proposed = StreamWrite(
@@ -332,7 +336,7 @@ class _StreamPlanBuilder:
         current = self.writes.setdefault(key, proposed)
         if current.replacement_bytes != replacement:
             raise UnsupportedSpotUseError(
-                f"{label}: one shared stream requires conflicting replacements"
+                f"{label}: one shared stream requires conflicting replacements", location=label
             )
 
     def _page_stream_usage(self) -> dict[ObjectKey, set[int]]:

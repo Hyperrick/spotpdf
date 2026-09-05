@@ -70,6 +70,19 @@ def open_strict(
     *,
     limits: ProcessingLimits | None = DEFAULT_PROCESSING_LIMITS,
 ) -> pikepdf.Pdf:
+    """Record strict validation failures so reports never retry them with a renderer."""
+    try:
+        return _open_strict(path, limits=limits)
+    except Exception as error:
+        error.input_validation_failed = True
+        raise
+
+
+def _open_strict(
+    path: str | PathLike[str],
+    *,
+    limits: ProcessingLimits | None = DEFAULT_PROCESSING_LIMITS,
+) -> pikepdf.Pdf:
     """Open without recovery, preflight source budgets, and reject warnings."""
 
     path = Path(path)

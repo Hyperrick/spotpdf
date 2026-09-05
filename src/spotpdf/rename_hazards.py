@@ -44,7 +44,7 @@ def inspect_target_hazards(
     hazards = target_name_hazards(value, names, operation=operation)
     if hazards:
         _, message = hazards[0]
-        raise UnsupportedSpotUseError(f"{location}: {message}")
+        raise UnsupportedSpotUseError(f"{location}: {message}", location=location)
 
 
 def target_name_hazards(
@@ -259,3 +259,18 @@ __all__ = [
     "subtree_mentions",
     "target_name_hazards",
 ]
+
+
+def separation_info_contains(value: Any, source: str) -> bool | None:
+    """Return source membership, or ``None`` when optional ColorSpace is absent."""
+
+    if value is None:
+        return None
+    if not isinstance(value, pikepdf.Array) or not value:
+        return False
+    family = name_value(value[0])
+    if family == "Separation":
+        return is_matching_separation(value, source)
+    if family == "DeviceN" and len(value) >= 2:
+        return name_array_contains(value[1], source)
+    return False

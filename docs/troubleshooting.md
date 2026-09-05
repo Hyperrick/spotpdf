@@ -83,6 +83,16 @@ originating design or prepress workflow to create a supported standalone
 with a minimal synthetic reproducer. Do not patch PDF objects or delete resource
 entries as a workaround.
 
+## Locate the failed object visually
+
+Repeat the intended command with `--dry-run --report report.html` instead of a PDF
+output path. The offline HTML links errors to original objects, source operators,
+page previews, and enlarged excerpts where that correspondence is reliable.
+`--report-overwrite` explicitly replaces an older report. A partial report explains
+unmapped objects, diagnostic limits, and areas where analysis stopped; inspect
+those notices before treating it as a complete inventory. See
+[diagnostic reports](diagnostic-reports.md) for examples and failure semantics.
+
 ## A processing budget is exceeded
 
 **Symptom:** Text output starts with `processing budget exceeded:`, or JSON reports

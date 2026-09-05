@@ -76,7 +76,8 @@ def collect_target_resource_removals(
             )
             if key in _DEFAULT_COLOR_SPACES:
                 raise UnsupportedSpotUseError(
-                    f"{min(slot_locations)}: target is a default color-space override"
+                    f"{min(slot_locations)}: target is a default color-space override",
+                    location=min(slot_locations),
                 )
             definition_id = targets.definition_id_for(slot_locations)
             identity = (*object_key(color_spaces), str(key))
@@ -93,7 +94,8 @@ def collect_target_resource_removals(
                 or current.original_fingerprint != proposed.original_fingerprint
             ):
                 raise UnsupportedSpotUseError(
-                    f"{min(slot_locations)}: shared resource alias resolves inconsistently"
+                    f"{min(slot_locations)}: shared resource alias resolves inconsistently",
+                    location=min(slot_locations),
                 )
             current.locations.update(slot_locations)
         if context_has_target:
@@ -108,7 +110,8 @@ def collect_target_resource_removals(
         unsupported = sorted(targets.locations - planned_locations)
         detail = min(unsupported or ["unknown location"])
         raise UnsupportedSpotUseError(
-            f"{detail}: target Separation is not exclusively a removable resource alias"
+            f"{detail}: target Separation is not exclusively a removable resource alias",
+            location=detail,
         )
     planned_ids = {removal.definition_id for removal in removals.values()}
     if planned_ids != targets.definition_ids:
