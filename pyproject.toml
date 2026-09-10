@@ -45,7 +45,7 @@ where = ["src"]
 spotpdf = ["py.typed"]
 
 [dependency-groups]
-dev = ["reportlab>=4.4,<5", "markdown-it-py>=4.2,<5", "ruff>=0.12,<1", "setuptools==84.0.0"]
+dev = ["reportlab>=4.4,<6", "markdown-it-py>=4.2,<5", "ruff>=0.12,<1", "setuptools==84.0.0"]
 release = ["readme-renderer[md]>=46,<47", "twine>=7,<8"]
 
 [tool.ruff]
