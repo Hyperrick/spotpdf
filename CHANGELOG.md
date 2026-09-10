@@ -5,6 +5,8 @@ All notable user-visible changes are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-10
+
 ### Added
 
 - Optional `--report` HTML diagnostics for mutation commands and dry runs, with
@@ -300,7 +302,8 @@ First public beta release.
 - Verify saved output before atomic replacement and preserve an existing forced
   destination whenever processing fails.
 
-[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/Hyperrick/spotpdf/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Hyperrick/spotpdf/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Hyperrick/spotpdf/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Hyperrick/spotpdf/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Hyperrick/spotpdf/compare/v0.5.0...v0.6.0
