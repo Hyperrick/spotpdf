@@ -16,18 +16,18 @@
     "src/spotpdf/diagnostics.py": "ba38985c8c6cc47060f85fc68ab1e659f795f0214a8d6af2388cef593b8862fd",
     "scripts/create_report_example.py": "b8fea9e5ac0176f71f694d293cf1fff5b185acd627a49186044e5c0d09c32014",
     "pyproject.toml": "aa6763cee6a427771ce9c21a4d018034d2ae807a45f748502cd37070fb514b43",
-    "uv.lock": "35d13991f77e8a70a0b2a81f598cc34375162f5c7df1d5ad208e905755c20082"
+    "uv.lock": "87a32af32ac4ea75bdddcba3b30e9e5b2b6ac0570655c497971289ad81293b24"
   },
   "screenshots": {
     "finding.png": {
-      "sha256": "8c00979fe8ef11fac58b4cde5f2b5afe25520a7705934466a28ef64debb71026",
+      "sha256": "b3019e3030412e5c5607848668c55b7405d2019527715a7798943c5f06147dfe",
       "size": [
         992,
         582
       ]
     },
     "page-location.png": {
-      "sha256": "3c36587d1abab10e0ef12694c7e1f92e69adce7210b872eb576eda9a62e2aa67",
+      "sha256": "55a9fe356ec426e3052c24473fa267f4c7534c85610bd425518e202aa8311f6d",
       "size": [
         992,
         1309
