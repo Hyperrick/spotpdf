@@ -69,6 +69,6 @@
     "src/spotpdf/scan.py": "394da4880461b0adbdb938cc0d9784ee6d3766944f65e5cafca0f6045625ff41",
     "src/spotpdf/separation_targets.py": "e3e9a254bec68fa4f925526a12f4394d1eeed6a01070fd2d56cdef07021ed564",
     "src/spotpdf/trailer_semantics.py": "be0b6f09645ea4894fb158ce720823e6a785df43c3b87273290aa19093a7bd6e",
-    "uv.lock": "b4615f435cf3dc4a2d654c3c7b37d4885260820517f71dbd963f5436765e01ca"
+    "uv.lock": "dbd65601d5984edf940944c606d170a8d899cbd156e1135e58488a366b395f83"
   }
 }
