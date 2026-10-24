@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: Multimedia :: Graphics",
     "Topic :: Printing",
 ]
-dependencies = ["pikepdf>=10.12,<11", "pypdfium2>=5.13,<6", "Pillow>=11,<13"]
+dependencies = ["pikepdf>=10.12,<11", "pypdfium2>=5.13,<6", "Pillow>=11,<14"]
 
 [project.urls]
 Documentation = "https://github.com/Hyperrick/spotpdf#readme"
