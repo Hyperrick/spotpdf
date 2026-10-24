@@ -15,8 +15,8 @@
     "src/spotpdf/report_worker.py": "ab9f3dad864d501bf3ff7d141c05fe4b2b0de6f86a92f512e4deacc4c414a604",
     "src/spotpdf/diagnostics.py": "ba38985c8c6cc47060f85fc68ab1e659f795f0214a8d6af2388cef593b8862fd",
     "scripts/create_report_example.py": "b8fea9e5ac0176f71f694d293cf1fff5b185acd627a49186044e5c0d09c32014",
-    "pyproject.toml": "c68c74e2d45100f205bd21f5bd233a58567d10ae4b2c9c63d64417a4f47dd07c",
-    "uv.lock": "23a01bcd707e84a8cae28fd462e2c0daad6226dfa51f5e508f635aff4e6b165a"
+    "pyproject.toml": "984f9b694e325ae77ed885c89e3580472151056ece499907172a51aa990e1884",
+    "uv.lock": "e2bfc62e701350d2b5af40679491efa8128263bda4af6c5d97c72ee14380be59"
   },
   "screenshots": {
     "finding.png": {
