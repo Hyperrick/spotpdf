@@ -300,9 +300,10 @@ def _verify_plates(case: CorpusCase, before: set[str], after: set[str]) -> None:
     elif case.operation == "set-alternate":
         if case.source_spot not in before or before != after:
             raise RuntimeError("set-alternate changed the Ghostscript separation plate set")
-    elif case.operation == "convert":
-        if case.source_spot not in before or case.source_spot in after:
-            raise RuntimeError("Ghostscript still reports the converted Separation plate")
+    elif case.operation == "convert" and (
+        case.source_spot not in before or case.source_spot in after
+    ):
+        raise RuntimeError("Ghostscript still reports the converted Separation plate")
     for name in case.remove_spots:
         if name not in before or name in after:
             raise RuntimeError(f"Ghostscript plate removal failed for {name}")

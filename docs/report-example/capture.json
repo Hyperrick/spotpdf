@@ -16,11 +16,11 @@
     "src/spotpdf/diagnostics.py": "ba38985c8c6cc47060f85fc68ab1e659f795f0214a8d6af2388cef593b8862fd",
     "scripts/create_report_example.py": "b8fea9e5ac0176f71f694d293cf1fff5b185acd627a49186044e5c0d09c32014",
     "pyproject.toml": "d247520f50ecaa65d344709e299d3a1ee4975782cf4255550490c2ede0e60425",
-    "uv.lock": "56a7fea3499e5546b5b48cb46382a93f39263012a83ad65042d68cfe411229dd"
+    "uv.lock": "603d6aa35dd16102bfbad96b015b26cfdd418389a5423464dc0a283b1f071a03"
   },
   "screenshots": {
     "finding.png": {
-      "sha256": "b3019e3030412e5c5607848668c55b7405d2019527715a7798943c5f06147dfe",
+      "sha256": "2aadff4c2ebf1baedab87c6938773daeebe9d54e69046eb7367ec14171618571",
       "size": [
         992,
         582
@@ -35,7 +35,7 @@
     }
   },
   "playwright_cli": "0.1.19",
-  "pdfium": "5.14.0",
+  "pdfium": "5.15.2",
   "viewport": [
     1040,
     1100
