@@ -135,6 +135,7 @@ class InventoryEdgeTests(unittest.TestCase):
     def test_name_path_segments_are_unambiguous(self) -> None:
         path = self.root / "escaped-paths.pdf"
         with pikepdf.Pdf.new() as pdf:
+            pdf.add_blank_page(page_size=(100, 100))
             pdf.Root[pikepdf.Name("/A /B")] = self._separation("First")
             pdf.Root.A = pikepdf.Dictionary(B=self._separation("Second"))
             pdf.save(path)
